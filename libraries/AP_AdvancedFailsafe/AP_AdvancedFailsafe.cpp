@@ -27,6 +27,8 @@
 
 extern const AP_HAL::HAL& hal;
 
+uint32_t rc_terminate;
+
 // table of user settable parameters
 const AP_Param::GroupInfo AP_AdvancedFailsafe::var_info[] = {
     // @Param: ENABLE
@@ -178,7 +180,11 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
         _rc_fail_time_seconds > 0 &&
             (AP_HAL::millis() - last_valid_rc_ms) > (_rc_fail_time_seconds * 1000.0f)) {
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to RC failure");
-        _terminate.set_and_notify(1);
+        //terminate.set_and_notify(1);
+		rc_terminate = 1;
+    }
+    else{
+    	rc_terminate = 0;
     }
     
     // tell the failsafe board if we are in manual control
@@ -241,8 +247,10 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             // leads to termination if AFS_DUAL_LOSS is 1
             if(_enable_dual_loss) {
                 if (!_terminate) {
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to dual loss");
-                    _terminate.set_and_notify(1);
+                	if(rc_terminate){
+                        gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to dual loss");
+                        _terminate.set_and_notify(1);
+                	}
                 }
             }
         } else if (gcs_link_ok) {
@@ -263,8 +271,10 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             // losing GCS link when GPS lock lost
             // leads to termination if AFS_DUAL_LOSS is 1
             if (!_terminate && _enable_dual_loss) {
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to dual loss");
-                _terminate.set_and_notify(1);
+            	if(rc_terminate){
+            		gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to dual loss");
+                	_terminate.set_and_notify(1);
+            	}
             }
         } else if (gps_lock_ok) {
             gcs().send_text(MAV_SEVERITY_DEBUG, "AFS State: AFS_AUTO, GPS now OK");
