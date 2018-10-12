@@ -17,12 +17,19 @@
 struct LogStructure {
     uint8_t msg_type;
     uint8_t msg_len;
-    const char name[5];
-    const char format[16];
-    const char labels[64];
-    const char units[16];
-    const char multipliers[16];
+    const char *name;
+    const char *format;
+    const char *labels;
+    const char *units;
+    const char *multipliers;
 };
+
+// maximum lengths of fields in LogStructure, including trailing nulls
+static const uint8_t LS_NAME_SIZE = 5;
+static const uint8_t LS_FORMAT_SIZE = 17;
+static const uint8_t LS_LABELS_SIZE = 65;
+static const uint8_t LS_UNITS_SIZE = 17;
+static const uint8_t LS_MULTIPLIERS_SIZE = 17;
 
 /*
   log structures common to all vehicle types
@@ -60,7 +67,7 @@ struct PACKED log_Format_Units {
 
 struct UnitStructure {
     const char ID;
-    const char unit[64];
+    const char *unit;
 };
 
 struct MultiplierStructure {
@@ -92,12 +99,14 @@ const struct UnitStructure log_Units[] = {
     // { 'N', "N" },          // Newton
     { 'o', "m/s/s" },         // metres per second per second
     { 'O', "degC" },          // degrees Celsius. Not SI, but Kelvin is too cumbersome for most users
+    { '%', "%" },             // percent
     { 'S', "satellites" },    // number of satellites
     { 's', "s" },             // seconds
     { 'q', "rpm" },           // rounds per minute. Not SI, but sometimes more intuitive than Hertz
     { 'r', "rad" },           // radians
     { 'U', "deglongitude" },  // degrees of longitude
     { 'u', "ppm" },           // pulses per minute
+    { 'U', "us" },            // pulse width modulation in microseconds
     { 'v', "V" },             // Volt
     { 'P', "Pa" },            // Pascal
     { 'w', "Ohm" },           // Ohm
@@ -112,9 +121,9 @@ const struct UnitStructure log_Units[] = {
 // tl;dr a GCS shouldn't/mustn't infer any scaling from the unit name
 
 const struct MultiplierStructure log_Multipliers[] = {
-// <leave a gap here, just in case....>
     { '-', 0 },       // no multiplier e.g. a string
     { '?', 1 },       // multipliers which haven't been worked out yet....
+// <leave a gap here, just in case....>
     { '2', 1e2 },
     { '1', 1e1 },
     { '0', 1e0 },
@@ -356,6 +365,7 @@ struct PACKED log_POWR {
     float Vcc;
     float Vservo;
     uint16_t flags;
+    uint8_t safety_and_arm;
 };
 
 struct PACKED log_EKF1 {
@@ -608,6 +618,7 @@ struct PACKED log_Cmd {
     float latitude;
     float longitude;
     float altitude;
+    uint8_t frame;
 };
 
 struct PACKED log_Radio {
@@ -654,11 +665,11 @@ struct PACKED log_PID {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     float   desired;
+    float   actual;
     float   P;
     float   I;
     float   D;
     float   FF;
-    float   AFF;
 };
 
 struct PACKED log_Current {
@@ -818,10 +829,11 @@ struct PACKED log_GPS_SBF_EVENT {
 struct PACKED log_Esc {
     LOG_PACKET_HEADER;
     uint64_t time_us;     
-    int16_t rpm;
-    int16_t voltage;
-    int16_t current;
+    int32_t rpm;
+    uint16_t voltage;
+    uint16_t current;
     int16_t temperature;
+    uint16_t current_tot;
 };
 
 struct PACKED log_AIRSPEED {
@@ -1010,6 +1022,16 @@ struct PACKED log_Proximity {
     float closest_dist;
 };
 
+struct PACKED log_Performance {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint16_t num_long_running;
+    uint16_t num_loops;
+    uint32_t max_time;
+    uint32_t mem_avail;
+    uint16_t load;
+};
+
 struct PACKED log_SRTL {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -1057,10 +1079,10 @@ struct PACKED log_DSTL {
 #define BARO_UNITS "smPOnsmO"
 #define BARO_MULTS "F00B0C?0"
 
-#define ESC_LABELS "TimeUS,RPM,Volt,Curr,Temp"
-#define ESC_FMT   "Qcccc"
-#define ESC_UNITS "sqvAO"
-#define ESC_MULTS "FBBBB"
+#define ESC_LABELS "TimeUS,RPM,Volt,Curr,Temp,CTot"
+#define ESC_FMT   "QeCCcH"
+#define ESC_UNITS "sqvAO-"
+#define ESC_MULTS "FBBBB-"
 
 #define GPA_LABELS "TimeUS,VDop,HAcc,VAcc,SAcc,VV,SMS,Delta"
 #define GPA_FMT   "QCCCCBIH"
@@ -1071,7 +1093,7 @@ struct PACKED log_DSTL {
 #define GPS_LABELS "TimeUS,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,U"
 #define GPS_FMT   "QBIHBcLLefffB"
 #define GPS_UNITS "s---SmDUmnhn-"
-#define GPS_MULTS "F---0BGGBBB0-"
+#define GPS_MULTS "F---0BGGB000-"
 
 #define GYR_LABELS "TimeUS,SampleUS,GyrX,GyrY,GyrZ"
 #define GYR_FMT    "QQfff"
@@ -1103,7 +1125,7 @@ struct PACKED log_DSTL {
 #define MAG_UNITS "sGGGGGGGGG-s"
 #define MAG_MULTS "FCCCCCCCCC-F"
 
-#define PID_LABELS "TimeUS,Des,P,I,D,FF,AFF"
+#define PID_LABELS "TimeUS,Des,Act,P,I,D,FF"
 #define PID_FMT    "Qffffff"
 #define PID_UNITS  "s------"
 #define PID_MULTS  "F------"
@@ -1115,8 +1137,8 @@ struct PACKED log_DSTL {
 
 #define CURR_LABELS "TimeUS,Volt,VoltR,Curr,CurrTot,EnrgTot,Temp,Res"
 #define CURR_FMT    "Qfffffcf"
-#define CURR_UNITS  "sv?A?JOw"
-#define CURR_MULTS  "F????/??"
+#define CURR_UNITS  "svvA?JOw"
+#define CURR_MULTS  "F000?/?0"
 
 #define CURR_CELL_LABELS "TimeUS,Volt,V1,V2,V3,V4,V5,V6,V7,V8,V9,V10"
 #define CURR_CELL_FMT    "QfHHHHHHHHHH"
@@ -1181,33 +1203,61 @@ Format characters in the format string for binary log messages
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
     { LOG_RCIN_MSG, sizeof(log_RCIN), \
-      "RCIN",  "QHHHHHHHHHHHHHH",     "TimeUS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14", "suuuuuuuuuuuuuu", "F--------------" }, \
+      "RCIN",  "QHHHHHHHHHHHHHH",     "TimeUS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14", "sUUUUUUUUUUUUUU", "F--------------" }, \
     { LOG_RCOUT_MSG, sizeof(log_RCOUT), \
-      "RCOU",  "QHHHHHHHHHHHHHH",     "TimeUS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14", "suuuuuuuuuuuuuu", "F--------------"  }, \
+      "RCOU",  "QHHHHHHHHHHHHHH",     "TimeUS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14", "sUUUUUUUUUUUUUU", "F--------------"  }, \
     { LOG_RSSI_MSG, sizeof(log_RSSI), \
       "RSSI",  "Qf",     "TimeUS,RXRSSI", "s-", "F-"  }, \
     { LOG_BARO_MSG, sizeof(log_BARO), \
       "BARO",  BARO_FMT, BARO_LABELS, BARO_UNITS, BARO_MULTS }, \
     { LOG_POWR_MSG, sizeof(log_POWR), \
-      "POWR","QffH","TimeUS,Vcc,VServo,Flags", "svv-", "FBB-" },  \
+      "POWR","QffHB","TimeUS,Vcc,VServo,Flags,Safety", "svv--", "F00--" },  \
     { LOG_CMD_MSG, sizeof(log_Cmd), \
-      "CMD", "QHHHfffffff","TimeUS,CTot,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt", "s-------DUm", "F-------GG0" }, \
+      "CMD", "QHHHfffffffB","TimeUS,CTot,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame", "s-------DUm-", "F-------GG0-" }, \
     { LOG_RADIO_MSG, sizeof(log_Radio), \
       "RAD", "QBBBBBHH", "TimeUS,RSSI,RemRSSI,TxBuf,Noise,RemNoise,RxErrors,Fixed", "s-------", "F-------" }, \
     { LOG_CAMERA_MSG, sizeof(log_Camera), \
       "CAM", "QIHLLeeeccC","TimeUS,GPSTime,GPSWeek,Lat,Lng,Alt,RelAlt,GPSAlt,Roll,Pitch,Yaw", "s--DUmmmddd", "F--GGBBBBBB" }, \
     { LOG_TRIGGER_MSG, sizeof(log_Camera), \
-            "TRIG", "QIHLLeeeccC","TimeUS,GPSTime,GPSWeek,Lat,Lng,Alt,RelAlt,GPSAlt,Roll,Pitch,Yaw", "s--DUmmmddd", "F--GGBBBBBB" }, \
+      "TRIG", "QIHLLeeeccC","TimeUS,GPSTime,GPSWeek,Lat,Lng,Alt,RelAlt,GPSAlt,Roll,Pitch,Yaw", "s--DUmmmddd", "F--GGBBBBBB" }, \
     { LOG_ARSP_MSG, sizeof(log_AIRSPEED), "ARSP",  ARSP_FMT, ARSP_LABELS, ARSP_UNITS, ARSP_MULTS }, \
     { LOG_ASP2_MSG, sizeof(log_AIRSPEED), "ASP2",  ARSP_FMT, ARSP_LABELS, ARSP_UNITS, ARSP_MULTS }, \
     { LOG_CURRENT_MSG, sizeof(log_Current), \
       "BAT", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS },  \
     { LOG_CURRENT2_MSG, sizeof(log_Current), \
       "BAT2", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT3_MSG, sizeof(log_Current), \
+      "BAT3", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT4_MSG, sizeof(log_Current), \
+      "BAT4", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT5_MSG, sizeof(log_Current), \
+      "BAT5", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT6_MSG, sizeof(log_Current), \
+      "BAT6", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT7_MSG, sizeof(log_Current), \
+      "BAT7", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT8_MSG, sizeof(log_Current), \
+      "BAT8", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
+    { LOG_CURRENT9_MSG, sizeof(log_Current), \
+      "BAT9", CURR_FMT,CURR_LABELS,CURR_UNITS,CURR_MULTS }, \
     { LOG_CURRENT_CELLS_MSG, sizeof(log_Current_Cells), \
       "BCL", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
     { LOG_CURRENT_CELLS2_MSG, sizeof(log_Current_Cells), \
       "BCL2", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS3_MSG, sizeof(log_Current_Cells), \
+      "BCL3", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS4_MSG, sizeof(log_Current_Cells), \
+      "BCL4", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS5_MSG, sizeof(log_Current_Cells), \
+      "BCL5", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS6_MSG, sizeof(log_Current_Cells), \
+      "BCL6", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS7_MSG, sizeof(log_Current_Cells), \
+      "BCL7", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS8_MSG, sizeof(log_Current_Cells), \
+      "BCL8", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
+    { LOG_CURRENT_CELLS9_MSG, sizeof(log_Current_Cells), \
+      "BCL9", CURR_CELL_FMT, CURR_CELL_LABELS, CURR_CELL_UNITS, CURR_CELL_MULTS }, \
 	{ LOG_ATTITUDE_MSG, sizeof(log_Attitude),\
       "ATT", "QccccCCCC", "TimeUS,DesRoll,Roll,DesPitch,Pitch,DesYaw,Yaw,ErrRP,ErrYaw", "sddddhhdh", "FBBBBBBBB" }, \
     { LOG_COMPASS_MSG, sizeof(log_Compass), \
@@ -1217,11 +1267,13 @@ Format characters in the format string for binary log messages
     { LOG_RFND_MSG, sizeof(log_RFND), \
       "RFND", "QCBCB", "TimeUS,Dist1,Orient1,Dist2,Orient2", "sm-m-", "FB-B-" }, \
     { LOG_DF_MAV_STATS, sizeof(log_DF_MAV_Stats), \
-      "DMS", "IIIIIBBBBBBBBBB",         "TimeMS,N,Dp,RT,RS,Er,Fa,Fmn,Fmx,Pa,Pmn,Pmx,Sa,Smn,Smx", "s--------------", "F--------------" }, \
+      "DMS", "IIIIIBBBBBBBBBB",         "TimeMS,N,Dp,RT,RS,Er,Fa,Fmn,Fmx,Pa,Pmn,Pmx,Sa,Smn,Smx", "s--------------", "C--------------" }, \
     { LOG_BEACON_MSG, sizeof(log_Beacon), \
       "BCN", "QBBfffffff",  "TimeUS,Health,Cnt,D0,D1,D2,D3,PosX,PosY,PosZ", "s--mmmmmmm", "F--BBBBBBB" }, \
     { LOG_PROXIMITY_MSG, sizeof(log_Proximity), \
       "PRX", "QBfffffffffff", "TimeUS,Health,D0,D45,D90,D135,D180,D225,D270,D315,DUp,CAn,CDis", "s-mmmmmmmmmhm", "F-BBBBBBBBB00" }, \
+    { LOG_PERFORMANCE_MSG, sizeof(log_Performance),                     \
+      "PM",  "QHHIIH", "TimeUS,NLon,NLoop,MaxT,Mem,Load", "s---b%", "F---0A" }, \
     { LOG_SRTL_MSG, sizeof(log_SRTL), \
       "SRTL", "QBHHBfff", "TimeUS,Active,NumPts,MaxPts,Action,N,E,D", "s----mmm", "F----000" }
 
@@ -1232,11 +1284,11 @@ Format characters in the format string for binary log messages
     { LOG_IMU3_MSG, sizeof(log_IMU), \
       "IMU3",  IMU_FMT,     IMU_LABELS, IMU_UNITS, IMU_MULTS }, \
     { LOG_AHR2_MSG, sizeof(log_AHRS), \
-      "AHR2","QccCfLLffff","TimeUS,Roll,Pitch,Yaw,Alt,Lat,Lng,Q1,Q2,Q3,Q4","sddhmDU????", "FBBBBGG????" }, \
+      "AHR2","QccCfLLffff","TimeUS,Roll,Pitch,Yaw,Alt,Lat,Lng,Q1,Q2,Q3,Q4","sddhmDU????", "FBBB0GG????" }, \
     { LOG_POS_MSG, sizeof(log_POS), \
-      "POS","QLLfff","TimeUS,Lat,Lng,Alt,RelHomeAlt,RelOriginAlt", "sDUmmm", "FGGBBB" }, \
+      "POS","QLLfff","TimeUS,Lat,Lng,Alt,RelHomeAlt,RelOriginAlt", "sDUmmm", "FGG000" }, \
     { LOG_SIMSTATE_MSG, sizeof(log_AHRS), \
-"SIM","QccCfLLffff","TimeUS,Roll,Pitch,Yaw,Alt,Lat,Lng,Q1,Q2,Q3,Q4", "sddhmDU????", "FBBB0GG????" }, \
+      "SIM","QccCfLLffff","TimeUS,Roll,Pitch,Yaw,Alt,Lat,Lng,Q1,Q2,Q3,Q4", "sddhmDU????", "FBBB0GG????" }, \
     { LOG_NKF1_MSG, sizeof(log_EKF1), \
       "NKF1","QccCfffffffccce","TimeUS,Roll,Pitch,Yaw,VN,VE,VD,dPD,PN,PE,PD,GX,GY,GZ,OH", "sddhnnnnmmmkkkm", "FBBB0000000BBBB" }, \
     { LOG_NKF2_MSG, sizeof(log_NKF2), \
@@ -1284,13 +1336,13 @@ Format characters in the format string for binary log messages
     { LOG_XKFD_MSG, sizeof(log_ekfBodyOdomDebug), \
       "XKFD","Qffffff","TimeUS,IX,IY,IZ,IVX,IVY,IVZ", "s------", "F------" }, \
     { LOG_XKV1_MSG, sizeof(log_ekfStateVar), \
-            "XKV1","Qffffffffffff","TimeUS,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s------------", "F------------" }, \
+      "XKV1","Qffffffffffff","TimeUS,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s------------", "F------------" }, \
     { LOG_XKV2_MSG, sizeof(log_ekfStateVar), \
       "XKV2","Qffffffffffff","TimeUS,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s------------", "F------------" }, \
     { LOG_TERRAIN_MSG, sizeof(log_TERRAIN), \
       "TERR","QBLLHffHH","TimeUS,Status,Lat,Lng,Spacing,TerrH,CHeight,Pending,Loaded", "s-DU-mm--", "F-GG-00--" }, \
     { LOG_GPS_UBX1_MSG, sizeof(log_Ubx1), \
-"UBX1", "QBHBBHI",  "TimeUS,Instance,noisePerMS,jamInd,aPower,agcCnt,config", "s------", "F------"  }, \
+      "UBX1", "QBHBBHI",  "TimeUS,Instance,noisePerMS,jamInd,aPower,agcCnt,config", "s------", "F------"  }, \
     { LOG_GPS_UBX2_MSG, sizeof(log_Ubx2), \
       "UBX2", "QBbBbB", "TimeUS,Instance,ofsI,magI,ofsQ,magQ", "s-----", "F-----" }, \
     { LOG_GPS2_UBX1_MSG, sizeof(log_Ubx1), \
@@ -1380,9 +1432,10 @@ Format characters in the format string for binary log messages
     { LOG_RATE_MSG, sizeof(log_Rate), \
       "RATE", "Qffffffffffff",  "TimeUS,RDes,R,ROut,PDes,P,POut,YDes,Y,YOut,ADes,A,AOut", "skk-kk-kk-oo-", "F?????????BB-" }, \
     { LOG_RALLY_MSG, sizeof(log_Rally), \
-            "RALY", "QBBLLh", "TimeUS,Tot,Seq,Lat,Lng,Alt", "s--DUm", "F--GGB" },  \
+      "RALY", "QBBLLh", "TimeUS,Tot,Seq,Lat,Lng,Alt", "s--DUm", "F--GGB" },  \
     { LOG_VISUALODOM_MSG, sizeof(log_VisualOdom), \
-            "VISO", "Qffffffff", "TimeUS,dt,AngDX,AngDY,AngDZ,PosDX,PosDY,PosDZ,conf", "ssrrrmmm-", "FF000000-" }
+      "VISO", "Qffffffff", "TimeUS,dt,AngDX,AngDY,AngDZ,PosDX,PosDY,PosDZ,conf", "ssrrrmmm-", "FF000000-" }
+
 
 // #if SBP_HW_LOGGING
 #define LOG_SBP_STRUCTURES \
@@ -1398,11 +1451,40 @@ Format characters in the format string for binary log messages
 
 #define LOG_COMMON_STRUCTURES LOG_BASE_STRUCTURES, LOG_EXTRA_STRUCTURES, LOG_SBP_STRUCTURES
 
-// message types 0 to 128 reversed for vehicle specific use
+// message types 0 to 63 reserved for vehicle specific use
 
 // message types for common messages
-enum LogMessages {
-    LOG_FORMAT_MSG = 128,
+enum LogMessages : uint8_t {
+    LOG_NKF1_MSG = 64,
+    LOG_NKF2_MSG,
+    LOG_NKF3_MSG,
+    LOG_NKF4_MSG,
+    LOG_NKF5_MSG,
+    LOG_NKF6_MSG,
+    LOG_NKF7_MSG,
+    LOG_NKF8_MSG,
+    LOG_NKF9_MSG,
+    LOG_NKF10_MSG,
+    LOG_NKQ1_MSG,
+    LOG_NKQ2_MSG,
+    LOG_XKF1_MSG,
+    LOG_XKF2_MSG,
+    LOG_XKF3_MSG,
+    LOG_XKF4_MSG,
+    LOG_XKF5_MSG,
+    LOG_XKF6_MSG,
+    LOG_XKF7_MSG,
+    LOG_XKF8_MSG,
+    LOG_XKF9_MSG,
+    LOG_XKF10_MSG,
+    LOG_XKQ1_MSG,
+    LOG_XKQ2_MSG,
+    LOG_XKFD_MSG,
+    LOG_XKV1_MSG,
+    LOG_XKV2_MSG,
+
+    LOG_FORMAT_MSG = 128, // this must remain #128
+
     LOG_PARAMETER_MSG,
     LOG_GPS_MSG,
     LOG_GPS2_MSG,
@@ -1440,8 +1522,22 @@ enum LogMessages {
     LOG_ATTITUDE_MSG,
     LOG_CURRENT_MSG,
     LOG_CURRENT2_MSG,
+    LOG_CURRENT3_MSG,
+    LOG_CURRENT4_MSG,
+    LOG_CURRENT5_MSG,
+    LOG_CURRENT6_MSG,
+    LOG_CURRENT7_MSG,
+    LOG_CURRENT8_MSG,
+    LOG_CURRENT9_MSG,
     LOG_CURRENT_CELLS_MSG,
     LOG_CURRENT_CELLS2_MSG,
+    LOG_CURRENT_CELLS3_MSG,
+    LOG_CURRENT_CELLS4_MSG,
+    LOG_CURRENT_CELLS5_MSG,
+    LOG_CURRENT_CELLS6_MSG,
+    LOG_CURRENT_CELLS7_MSG,
+    LOG_CURRENT_CELLS8_MSG,
+    LOG_CURRENT_CELLS9_MSG,
     LOG_COMPASS_MSG,
     LOG_COMPASS2_MSG,
     LOG_COMPASS3_MSG,
@@ -1474,33 +1570,6 @@ enum LogMessages {
     LOG_GPAB_MSG,
     LOG_RFND_MSG,
     LOG_BAR3_MSG,
-    LOG_NKF1_MSG,
-    LOG_NKF2_MSG,
-    LOG_NKF3_MSG,
-    LOG_NKF4_MSG,
-    LOG_NKF5_MSG,
-    LOG_NKF6_MSG,
-    LOG_NKF7_MSG,
-    LOG_NKF8_MSG,
-    LOG_NKF9_MSG,
-    LOG_NKF10_MSG,
-    LOG_NKQ1_MSG,
-    LOG_NKQ2_MSG,
-    LOG_XKF1_MSG,
-    LOG_XKF2_MSG,
-    LOG_XKF3_MSG,
-    LOG_XKF4_MSG,
-    LOG_XKF5_MSG,
-    LOG_XKF6_MSG,
-    LOG_XKF7_MSG,
-    LOG_XKF8_MSG,
-    LOG_XKF9_MSG,
-    LOG_XKF10_MSG,
-    LOG_XKQ1_MSG,
-    LOG_XKQ2_MSG,
-    LOG_XKFD_MSG,
-    LOG_XKV1_MSG,
-    LOG_XKV2_MSG,
     LOG_DF_MAV_STATS,
     LOG_FORMAT_UNITS_MSG,
     LOG_UNIT_MSG,
@@ -1530,8 +1599,11 @@ enum LogMessages {
     LOG_ISBH_MSG,
     LOG_ISBD_MSG,
     LOG_ASP2_MSG,
-
+    LOG_PERFORMANCE_MSG,
+    _LOG_LAST_MSG_
 };
+
+static_assert(_LOG_LAST_MSG_ <= 255, "Too many message formats");
 
 enum LogOriginType {
     ekf_origin = 0,

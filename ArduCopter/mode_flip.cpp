@@ -6,7 +6,7 @@
  *      Adapted and updated for AC2 in 2011 by Jason Short
  *
  *      Controls:
- *          CH7_OPT - CH12_OPT parameter must be set to "Flip" (AUXSW_FLIP) which is "2"
+ *          RC7_OPTION - RC12_OPTION parameter must be set to "Flip" (AUXSW_FLIP) which is "2"
  *          Pilot switches to Stabilize, Acro or AltHold flight mode and puts ch7/ch8 switch to ON position
  *          Vehicle will Roll right by default but if roll or pitch stick is held slightly left, forward or back it will flip in that direction
  *          Vehicle should complete the roll within 2.5sec and will then return to the original flight mode it was in before flip was triggered
@@ -75,11 +75,11 @@ bool Copter::ModeFlip::init(bool ignore_checks)
     // choose direction based on pilot's roll and pitch sticks
     if (channel_pitch->get_control_in() > 300) {
         flip_pitch_dir = FLIP_PITCH_BACK;
-    }else if(channel_pitch->get_control_in() < -300) {
+    } else if (channel_pitch->get_control_in() < -300) {
         flip_pitch_dir = FLIP_PITCH_FORWARD;
-    }else if (channel_roll->get_control_in() >= 0) {
+    } else if (channel_roll->get_control_in() >= 0) {
         flip_roll_dir = FLIP_ROLL_RIGHT;
-    }else{
+    } else {
         flip_roll_dir = FLIP_ROLL_LEFT;
     }
 
@@ -180,7 +180,7 @@ void Copter::ModeFlip::run()
 
     case Flip_Recover:
         // use originally captured earth-frame angle targets to recover
-        attitude_control->input_euler_angle_roll_pitch_yaw(flip_orig_attitude.x, flip_orig_attitude.y, flip_orig_attitude.z, false, get_smoothing_gain());
+        attitude_control->input_euler_angle_roll_pitch_yaw(flip_orig_attitude.x, flip_orig_attitude.y, flip_orig_attitude.z, false);
 
         // increase throttle to gain any lost altitude
         throttle_out += FLIP_THR_INC;

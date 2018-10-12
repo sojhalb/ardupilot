@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__CYGWIN64__)
 #include <windows.h>
 #include <time.h>
 #include <mmsystem.h>
@@ -54,15 +54,23 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     rate_hz(1200.0f),
     autotest_dir(nullptr),
     frame(frame_str),
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__CYGWIN64__)
     min_sleep_time(20000)
 #else
     min_sleep_time(5000)
 #endif
 {
     // make the SIM_* variables available to simulator backends
-    sitl = (SITL *)AP_Param::find_object("SIM_");
-    parse_home(home_str, home, home_yaw);
+    sitl = AP::sitl();
+
+    if (!parse_home(home_str, home, home_yaw)) {
+        ::printf("Failed to parse home string (%s).  Should be LAT,LON,ALT,HDG e.g. 37.4003371,-122.0800351,0,353\n", home_str);
+    }
+    ::printf("Home: %f %f alt=%fm hdg=%f\n",
+             home.lat*1e-7,
+             home.lng*1e-7,
+             home.alt*0.01,
+             home_yaw);
     location = home;
     ground_level = home.alt * 0.01f;
 
@@ -76,8 +84,7 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     // allow for orientation settings, such as with tailsitters
     enum ap_var_type ptype;
     ahrs_orientation = (AP_Int8 *)AP_Param::find("AHRS_ORIENTATION", &ptype);
-
-    terrain = (AP_Terrain *)AP_Param::find_object("TERRAIN_");
+    terrain = reinterpret_cast<AP_Terrain *>(AP_Param::find_object("TERRAIN_"));
 }
 
 
@@ -90,26 +97,31 @@ bool Aircraft::parse_home(const char *home_str, Location &loc, float &yaw_degree
     char *s = strdup(home_str);
     if (!s) {
         free(s);
+        ::printf("No home string supplied\n");
         return false;
     }
     char *lat_s = strtok_r(s, ",", &saveptr);
     if (!lat_s) {
         free(s);
+        ::printf("Failed to parse latitude\n");
         return false;
     }
     char *lon_s = strtok_r(nullptr, ",", &saveptr);
     if (!lon_s) {
         free(s);
+        ::printf("Failed to parse longitude\n");
         return false;
     }
     char *alt_s = strtok_r(nullptr, ",", &saveptr);
     if (!alt_s) {
         free(s);
+        ::printf("Failed to parse altitude\n");
         return false;
     }
     char *yaw_s = strtok_r(nullptr, ",", &saveptr);
     if (!yaw_s) {
         free(s);
+        ::printf("Failed to parse yaw\n");
         return false;
     }
 
@@ -138,7 +150,8 @@ bool Aircraft::parse_home(const char *home_str, Location &loc, float &yaw_degree
 float Aircraft::ground_height_difference() const
 {
     float h1, h2;
-    if (sitl->terrain_enable && terrain &&
+    if (sitl &&
+        sitl->terrain_enable && terrain &&
         terrain->height_amsl(home, h1, false) &&
         terrain->height_amsl(location, h2, false)) {
         return h2 - h1;
@@ -158,7 +171,7 @@ float Aircraft::hagl() const
 */
 bool Aircraft::on_ground() const
 {
-    return hagl() <= 0;
+    return hagl() <= 0.001f;  // prevent bouncing around ground
 }
 
 /*
@@ -246,7 +259,7 @@ void Aircraft::setup_frame_time(float new_rate, float new_speedup)
 /* adjust frame_time calculation */
 void Aircraft::adjust_frame_time(float new_rate)
 {
-    if (rate_hz != new_rate) {
+    if (!is_equal(rate_hz, new_rate)) {
         rate_hz = new_rate;
         frame_time_us = static_cast<uint64_t>(1.0e6f/rate_hz);
         scaled_frame_time_us = frame_time_us/target_speedup;
@@ -408,7 +421,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
         }
     }
     
-    if (last_speedup != sitl->speedup && sitl->speedup > 0) {
+    if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
         set_speedup(sitl->speedup);
         last_speedup = sitl->speedup;
     }
@@ -416,7 +429,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
 
 uint64_t Aircraft::get_wall_time_us() const
 {
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__CYGWIN64__)
     static DWORD tPrev;
     static uint64_t last_ret_us;
     if (tPrev == 0) {
@@ -723,4 +736,24 @@ void Aircraft::extrapolate_sensors(float delta_time)
     velocity_air_bf = dcm.transposed() * velocity_air_ef;
 }
 
+void Aircraft::update_external_payload(const struct sitl_input &input)
+{
+    external_payload_mass = 0;
 
+    // update sprayer
+    if (sprayer && sprayer->is_enabled()) {
+        sprayer->update(input);
+        external_payload_mass += sprayer->payload_mass();
+    }
+
+    // update grippers
+    if (gripper && gripper->is_enabled()) {
+        gripper->set_alt(hagl());
+        gripper->update(input);
+        external_payload_mass += gripper->payload_mass();
+    }
+    if (gripper_epm && gripper_epm->is_enabled()) {
+        gripper_epm->update(input);
+        external_payload_mass += gripper_epm->payload_mass();
+    }
+}
