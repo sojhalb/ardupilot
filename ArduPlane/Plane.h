@@ -163,7 +163,16 @@ public:
     void setup() override;
     void loop() override;
 
+    AP_GPS* get_gps() {return &gps};
+
 private:
+    void update_drop_nerf();
+    void update_drop_glider();
+    void update_drop_water();
+    void OD_control_sequence(); //OD = Object Drop
+    void Glider_Release_Service(double Drop_lat_Position, double Drop_lng_Position, double Drop_alt_Position);
+    void Water_Bottle_Release_Service(double Drop_lat_Position, double Drop_lng_Position, double Drop_alt_Position);
+    void Nerf_Release_Service(double Drop_lat_Position, double Drop_lng_Position, double Drop_alt_Position);
 
     // key aircraft parameters passed to multiple libraries
     AP_Vehicle::FixedWing aparm;

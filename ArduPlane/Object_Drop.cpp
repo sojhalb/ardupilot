@@ -1,32 +1,41 @@
-
 #pragma once
-
 #include "Plane.h"
-<<<<<<< HEAD
 #include <math.h>
-=======
->>>>>>> JD/ObjectDrop
 
-AP_Gripper_Backend Water_Bottle_Gripper_Backend();
-AP_Gripper Water_Bottle_Gripper();
+/*
+STILL LEFT TODO:
+    -calculate ideal drop location + get lat/lng/alt values every loop
+        -Create a drop Location location (class)
+        -**wind
+    -set defininte ranges (or create a function to vary ranges)
+    -Add everything to plane.h + scheduler
+    -Generate waypoint on Ardupilot
+*/
 
-AP_Gripper_Backend _Gripper_Backend();
-AP_Gripper _Gripper();
+AP_GPS* gps = plane.get_gps();
+const Location* location = gps->location();
+location.latitude;
 
-AP_Gripper_Backend Glider_Gripper_Backend();         
-AP_Gripper Glider_Gripper();
+AP_Gripper_Backend Water_Bottle_Gripper_Backend;
+AP_Gripper Water_Bottle_Gripper;
 
-double Water_Range_X = 0.5;                                         //Temp values
-double Water_Range_Y = 0.5;                                         //Temp values
-double Water_Range_Z = 0.5;                                         //Temp values
+AP_Gripper_Backend Nerf_Gripper_Backend;
+AP_Gripper Nerf_Gripper;
 
-double _Range_X = 0.5;                                              //Temp values
-double _Range_Y = 0.5;                                              //Temp values
-double _Range_Z = 0.5;                                              //Temp values
+AP_Gripper_Backend Glider_Gripper_Backend;         
+AP_Gripper Glider_Gripper;
 
-double Glider_Range_X = 0.5;                                        //Temp values
-double Glider_Range_Y = 0.5;                                        //Temp values
-double Glider_Range_Z = 0.5;                                        //Temp values
+double Water_Range_lat = 0.5;                                         //Temp values
+double Water_Range_lng = 0.5;                                         //Temp values
+double Water_Range_alt = 0.5;                                         //Temp values
+
+double Nerf_Range_lat = 0.5;                                              //Temp values
+double Nerf_Range_lng = 0.5;                                              //Temp values
+double Nerf_Range_alt = 0.5;                                              //Temp values
+
+double Glider_Range_lat = 0.5;                                        //Temp values
+double Glider_Range_lng = 0.5;                                        //Temp values
+double Glider_Range_alt = 0.5;                                        //Temp values
 
 void Fill_Water_Bottle_Config(AP_Gripper &Water_Bottle){
     Water_Bottle.backend = Water_Bottle_Gripper_Backend;
@@ -37,16 +46,16 @@ void Fill_Water_Bottle_Config(AP_Gripper &Water_Bottle){
     Water_Bottle.config.regrab_interval = 3;                        //Temp values
 }
 
-void Fill__Config(AP_Gripper &){
-    .backend = _Gripper_Backend;
-    .config.type = 1;                            
-    .config.grab_pwm = 1900;                                        //Temp values
-    .config.release_pwm = 1100;                                     //Temp values
-    .config.neutral_pwm = 1500;                                     //Temp values
-    .config.regrab_interval = 3;                                    //Temp values
+void Fill_Nerf_Config(AP_Gripper &Nerf){
+    Nerf.backend = Nerf_Gripper_Backend;
+    Nerf.config.type = 1;                            
+    Nerf.config.grab_pwm = 1900;                                        //Temp values
+    Nerf.config.release_pwm = 1100;                                     //Temp values
+    Nerf.config.neutral_pwm = 1500;                                     //Temp values
+    Nerf.config.regrab_interval = 3;                                    //Temp values
 }
 
-void Fill_Glider_Config(AP_Gripper &Water_Bottle){
+void Fill_Glider_Config(AP_Gripper &Glider){
     Glider.backend = Glider_Gripper_Backend;
     Glider.config.type = 1;                             
     Glider.config.grab_pwm = 1900;                                  //Temp values
@@ -55,22 +64,37 @@ void Fill_Glider_Config(AP_Gripper &Water_Bottle){
     Glider.config.regrab_interval = 3;                              //Temp values
 }
 
-void Gripper_Release_Service(double Current_X_Position, double Current_Y_Position, double Current_Z_Position,
-                                 double Drop_X_Position, double Drop_Y_Position, double Drop_Z_Position,
-                                    AP_Gripper &Gripper){
-
-    if (abs(Current_X_Position, Drop_X_Position) < Range_X &&
-          abs(Current_Y_Position, Drop_Y_Position) < Range_Y &&
-             abs(Current_Z_Position, Drop_Z_Position) < Range_Z){
+void Plane::Glider_Release_Service(double Drop_lat_Position, double Drop_lng_Position, double Drop_alt_Position){
+    if ((abs(current_loc.lat, Drop_lat_Position) < Glider_Range_lat && abs(current_loc.lng, Drop_lng_Position) < Glider_Range_lng &&
+             abs(current_loc.alt, Drop_alt_Position) < Glider_Range_alt) || Glider.is_moving_Away_from_drop()) {
                 Gripper.release();
+                Plane.update_drop_glider();
+    }
+}
+
+void Plane::Water_Bottle_Release_Service(double Drop_lat_Position, double Drop_lng_Position, double Drop_alt_Position){
+    if ((abs(current_loc.lat, Drop_lat_Position) < Water_Range_lat && abs(current_loc.lng, Drop_lng_Position) < Water_Range_lng &&
+             abs(current_loc.alt, Drop_alt_Position) < Water_Range_alt) || Water_Bottle_Gripper.is_moving_away_from_drop()) {
+                Gripper.release();
+                Plane.update_drop_water();
+    }
+}
+
+void Plane::Nerf_Release_Service(double Drop_lat_Position, double Drop_lng_Position, double Drop_alt_Position){
+    if ((abs(current_loc.lat, Drop_lat_Position) < Nerf_Range_lat && abs(current_loc.lng, Drop_lng_Position) < Nerf_Range_lng &&
+             abs(current_loc.alt, Drop_alt_Position) < Nerf_Range_alt) || Nerf_Gripper.is_moving_away_from_drop()) {
+                Gripper.release();
+                Plane.update_drop_nerf();
     }
 }
 //Starting Point?
 //have to change code to make water, nerf, and glider known to program
 
+
+
 enum state_e {IDLE, ARMED};
 
-void control_sequence ()
+void Plane::control_sequence ()
 {
     static state_e state = IDLE;
     switch(state)
@@ -91,48 +115,45 @@ void control_sequence ()
             calculate_new_drop_location();
             if(glider.is_drop == false)
             {
-                if(plane.posy>50 && glider.glider_drop_area() && (glider.within_drop_range() || glider.is_moving_away_from_drop()))//50 feet
+                if(current_loc.alt > 50)   //50 feet
                 {
-                    glider.drop();
-                    plane.update_drop_glider();
+                    Gripper_Release_Service(/*Need to input waypoint Locations*/, Glider_Gripper);
                 }
             }
             if(water.is_drop == false)
             {
-                if(plane.posy>100 && (water.within_drop_range() || water.is_moving_away_from_drop()))//100 feet
+                if(current_loc.alt > 100)  //100 feet
                 {
-                    water.drop();
-                    plane.update_drop_water();
+                    Gripper_Release_Service(/*Need to input waypoint Locations*/, Water_Bottle_Gripper);
                 }
             }
             if(nerf.is_drop == false)
             {
-                if(plane.posy>100 && (nerf.within_drop_range() || nerf.is_moving_away_from_drop()))//100 feet
+                if(current_loc.alt > 100)  //100 feet
                 {
-                    nerf.drop();
-                    nerf.update_drop_nerf();
+                    Gripper_Release_Service(/*Need to input waypoint Locations*/, Nerf_Gripper);
                 }
             }
             break;
     }
 }
-void Set_Water_Bottle_Release_Waypoint(){
-}
+void Set_Water_Bottle_Release_Waypoint(){}
 
-void update_drop_water () 
+void Plane::update_drop_water () 
 {
     if(water.is_drop == false)
         water.is_drop = true;
 }
-void update_drop_nerf () 
+void Plane::update_drop_nerf () 
 {
     if(nerf.is_drop == false)
         nerf.is_drop = true;
 }
-void update_drop_glider () 
+void Plane::update_drop_glider () 
 {
     if(glider.is_drop == false)
         glider.is_drop = true;
 }
+
 void calculate_new_drop_location()
 {}
