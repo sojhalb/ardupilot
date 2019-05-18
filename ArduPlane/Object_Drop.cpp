@@ -22,7 +22,7 @@ AP_Gripper Water_Bottle_Gripper;
 AP_Gripper_Backend Nerf_Gripper_Backend;
 AP_Gripper Nerf_Gripper;
 
-AP_Gripper_Backend Glider_Gripper_Backend;         
+AP_Gripper_Backend Glider_Gripper_Backend;
 AP_Gripper Glider_Gripper;
 
 double Water_Range_lat = 0.5;                                         //Temp values
@@ -37,9 +37,15 @@ double Glider_Range_lat = 0.5;                                        //Temp val
 double Glider_Range_lng = 0.5;                                        //Temp values
 double Glider_Range_alt = 0.5;                                        //Temp values
 
+
+// WIP
+int Is_Triggered_Glider(){
+
+}
+
 void Fill_Water_Bottle_Config(AP_Gripper &Water_Bottle){
     Water_Bottle.backend = Water_Bottle_Gripper_Backend;
-    Water_Bottle.config.type = 1;                            
+    Water_Bottle.config.type = 1;
     Water_Bottle.config.grab_pwm = 1900;                            //Temp values
     Water_Bottle.config.release_pwm = 1100;                         //Temp values
     Water_Bottle.config.neutral_pwm = 1500;                         //Temp values
@@ -48,7 +54,7 @@ void Fill_Water_Bottle_Config(AP_Gripper &Water_Bottle){
 
 void Fill_Nerf_Config(AP_Gripper &Nerf){
     Nerf.backend = Nerf_Gripper_Backend;
-    Nerf.config.type = 1;                            
+    Nerf.config.type = 1;
     Nerf.config.grab_pwm = 1900;                                        //Temp values
     Nerf.config.release_pwm = 1100;                                     //Temp values
     Nerf.config.neutral_pwm = 1500;                                     //Temp values
@@ -57,7 +63,7 @@ void Fill_Nerf_Config(AP_Gripper &Nerf){
 
 void Fill_Glider_Config(AP_Gripper &Glider){
     Glider.backend = Glider_Gripper_Backend;
-    Glider.config.type = 1;                             
+    Glider.config.type = 1;
     Glider.config.grab_pwm = 1900;                                  //Temp values
     Glider.config.release_pwm = 1100;                               //Temp values
     Glider.config.neutral_pwm = 1500;                               //Temp values
@@ -99,7 +105,7 @@ void Plane::control_sequence ()
     static state_e state = IDLE;
     switch(state)
     {
-        case IDLE: 
+        case IDLE:
             if(arming.is_armed())
             {
                 state = ARMED;
@@ -139,17 +145,17 @@ void Plane::control_sequence ()
 }
 void Set_Water_Bottle_Release_Waypoint(){}
 
-void Plane::update_drop_water () 
+void Plane::update_drop_water ()
 {
     if(water.is_drop == false)
         water.is_drop = true;
 }
-void Plane::update_drop_nerf () 
+void Plane::update_drop_nerf ()
 {
     if(nerf.is_drop == false)
         nerf.is_drop = true;
 }
-void Plane::update_drop_glider () 
+void Plane::update_drop_glider ()
 {
     if(glider.is_drop == false)
         glider.is_drop = true;
