@@ -1,7 +1,9 @@
 #pragma once
 #include "Plane.h"
 #include <math.h>
+#include <AP_HAL/AP_HAL.h>
 
+#define OUTPUTCH 4
 /*
 STILL LEFT TODO:
     -calculate ideal drop location + get lat/lng/alt values every loop
@@ -12,6 +14,7 @@ STILL LEFT TODO:
     -Generate waypoint on Ardupilot
 */
 
+/* Testing out RC INPUTOUTPUT
 AP_GPS* gps = plane.get_gps();
 const Location* location = gps->location();
 location.latitude;
@@ -36,12 +39,6 @@ double Nerf_Range_alt = 0.5;                                              //Temp
 double Glider_Range_lat = 0.5;                                        //Temp values
 double Glider_Range_lng = 0.5;                                        //Temp values
 double Glider_Range_alt = 0.5;                                        //Temp values
-
-
-// WIP
-int Is_Triggered_Glider(){
-
-}
 
 void Fill_Water_Bottle_Config(AP_Gripper &Water_Bottle){
     Water_Bottle.backend = Water_Bottle_Gripper_Backend;
@@ -93,9 +90,21 @@ void Plane::Nerf_Release_Service(double Drop_lat_Position, double Drop_lng_Posit
                 Plane.update_drop_nerf();
     }
 }
+*/
 //Starting Point?
 //have to change code to make water, nerf, and glider known to program
 
+// WIP
+const AP_HAL::HAL& = AP_HAL::get_HAL();
+
+int Is_Triggered_Glider(){
+
+}
+void Object_Release(){
+    hal.rcout->enable_ch(OUTPUTCH);
+    hal.rcout->write(OUTPUTCH, 1500);
+    hal.scheduler->delay(5);
+}
 
 
 enum state_e {IDLE, ARMED};
@@ -123,27 +132,32 @@ void Plane::control_sequence ()
             {
                 if(current_loc.alt > 50)   //50 feet
                 {
-                    Gripper_Release_Service(/*Need to input waypoint Locations*/, Glider_Gripper);
+                    Object_Release();
+                    //Gripper_Release_Service(/*Need to input waypoint Locations*/, Glider_Gripper);
                 }
             }
+            /* Testing out RC INPUTOUTPUT
             if(water.is_drop == false)
             {
                 if(current_loc.alt > 100)  //100 feet
                 {
-                    Gripper_Release_Service(/*Need to input waypoint Locations*/, Water_Bottle_Gripper);
+                    Gripper_Release_Service(//Need to input waypoint Locations, Water_Bottle_Gripper);
                 }
             }
             if(nerf.is_drop == false)
             {
                 if(current_loc.alt > 100)  //100 feet
                 {
-                    Gripper_Release_Service(/*Need to input waypoint Locations*/, Nerf_Gripper);
+                    Gripper_Release_Service(//Need to input waypoint Locations, Nerf_Gripper);
                 }
             }
+            */
             break;
     }
 }
-void Set_Water_Bottle_Release_Waypoint(){}
+void Set_Water_Bottle_Release_Waypoint(){
+
+}
 
 void Plane::update_drop_water ()
 {
@@ -161,5 +175,6 @@ void Plane::update_drop_glider ()
         glider.is_drop = true;
 }
 
-void calculate_new_drop_location()
-{}
+void calculate_new_drop_location(){
+    
+}
