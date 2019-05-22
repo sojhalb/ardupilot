@@ -10,7 +10,6 @@ const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 static uint16_t pwm = 1500;
 static int8_t delta = 1;
 
-
 void Plane::Object_Release(){
 
     hal.rcout->enable_ch(OUTPUTCH);
