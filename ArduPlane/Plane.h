@@ -163,7 +163,9 @@ public:
     void setup() override;
     void loop() override;
 
-    AP_GPS* get_gps() {return &gps};
+    AP_GPS* get_gps() {
+        return &gps;
+    }
 
 private:
     void update_drop_nerf();
