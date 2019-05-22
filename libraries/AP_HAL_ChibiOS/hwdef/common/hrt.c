@@ -19,49 +19,72 @@
 #include "hal.h"
 #include "hrt.h"
 #include <stdint.h>
+
+static uint64_t timer_base_us64;
+#if CH_CFG_ST_RESOLUTION == 16
+static uint32_t timer_base_us32;
+#endif
+static uint32_t timer_base_ms;
+static volatile systime_t last_systime;
+
+#if CH_CFG_ST_RESOLUTION == 16
+static uint32_t get_systime_us32(void)
+{
+    systime_t now = chVTGetSystemTimeX();
+    if (now < last_systime) {
+        uint32_t last_u32 = timer_base_us32;
+        timer_base_us32 += (uint32_t)TIME_MAX_SYSTIME;
+        if (timer_base_us32 < last_u32) {
+            timer_base_us64 += ((uint32_t)-1);
+            timer_base_ms += ((uint32_t)-1)/1000;
+        }
+    }
+    last_systime = now;
+    return timer_base_us32 + (uint32_t)now;
+}
+
+#elif CH_CFG_ST_RESOLUTION == 32
+static uint32_t get_systime_us32(void)
+{
+    systime_t now = chVTGetSystemTimeX();
+    if (now < last_systime) {
+        timer_base_us64 += TIME_MAX_SYSTIME;
+        timer_base_ms += TIME_MAX_SYSTIME/1000;
+    }
+    last_systime = now;
+    return now;
+}
+#else
+#error "unsupported timer resolution"
+#endif
+
 /*
- * HRT GPT configuration
- */
-
-
-//static void hrt_cb(GPTDriver*);
-static uint64_t timer_base = 0;
-static const GPTConfig hrtcfg = {
-  1000000,    /* 1MHz timer clock.*/
-  NULL,   /* Timer callback.*/
-  0,
-  0
-};
-
-
-void hrt_init()
-{
-	gptStart(&HRT_TIMER, &hrtcfg);
-	gptStartContinuous(&HRT_TIMER, 0xFFFF);
-}
-
-uint64_t hrt_micros()
-{
-	static volatile uint64_t last_micros = 0;
-	static volatile uint64_t micros;
-
-	syssts_t sts = chSysGetStatusAndLockX();
-	micros = timer_base + (uint64_t)gptGetCounterX(&HRT_TIMER);
-	// we are doing this to avoid an additional interupt routing
-	// since we are definitely going to get called atleast once in
-	// a full timer period
-	if(last_micros > micros) {
-		timer_base += 0x10000;
-		micros += 0x10000;
-	}
-	last_micros = micros;
-	chSysRestoreStatusX(sts);
-	return micros;
-}
-
-/*
-static void  hrt_cb(GPTDriver* gptd)
-{
-	timer_base += 0x10000;
-}
+  we use chSysGetStatusAndLockX() to prevent an interrupt while
+  allowing this call from any context
 */
+
+uint64_t hrt_micros64()
+{
+    syssts_t sts = chSysGetStatusAndLockX();
+    uint32_t now = get_systime_us32();
+    uint64_t ret = timer_base_us64 + now;
+    chSysRestoreStatusX(sts);
+    return ret;
+}
+
+uint32_t hrt_micros32()
+{
+    syssts_t sts = chSysGetStatusAndLockX();
+    uint32_t ret = get_systime_us32();
+    chSysRestoreStatusX(sts);
+    return ret;
+}
+
+uint32_t hrt_millis32()
+{
+    syssts_t sts = chSysGetStatusAndLockX();
+    uint32_t now = get_systime_us32();
+    uint32_t ret = (now / 1000U) + timer_base_ms;
+    chSysRestoreStatusX(sts);
+    return ret;
+}

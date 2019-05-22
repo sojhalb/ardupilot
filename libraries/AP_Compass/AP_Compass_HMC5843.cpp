@@ -94,10 +94,9 @@ extern const AP_HAL::HAL& hal;
 #define HMC5843_REG_ID_A 0x0A
 
 
-AP_Compass_HMC5843::AP_Compass_HMC5843(Compass &compass, AP_HMC5843_BusDriver *bus,
+AP_Compass_HMC5843::AP_Compass_HMC5843(AP_HMC5843_BusDriver *bus,
                                        bool force_external, enum Rotation rotation)
-    : AP_Compass_Backend(compass)
-    , _bus(bus)
+    : _bus(bus)
     , _rotation(rotation)
     , _force_external(force_external)
 {
@@ -108,8 +107,7 @@ AP_Compass_HMC5843::~AP_Compass_HMC5843()
     delete _bus;
 }
 
-AP_Compass_Backend *AP_Compass_HMC5843::probe(Compass &compass,
-                                              AP_HAL::OwnPtr<AP_HAL::Device> dev,
+AP_Compass_Backend *AP_Compass_HMC5843::probe(AP_HAL::OwnPtr<AP_HAL::Device> dev,
                                               bool force_external,
                                               enum Rotation rotation)
 {
@@ -121,7 +119,7 @@ AP_Compass_Backend *AP_Compass_HMC5843::probe(Compass &compass,
         return nullptr;
     }
 
-    AP_Compass_HMC5843 *sensor = new AP_Compass_HMC5843(compass, bus, force_external, rotation);
+    AP_Compass_HMC5843 *sensor = new AP_Compass_HMC5843(bus, force_external, rotation);
     if (!sensor || !sensor->init()) {
         delete sensor;
         return nullptr;
@@ -130,7 +128,7 @@ AP_Compass_Backend *AP_Compass_HMC5843::probe(Compass &compass,
     return sensor;
 }
 
-AP_Compass_Backend *AP_Compass_HMC5843::probe_mpu6000(Compass &compass, enum Rotation rotation)
+AP_Compass_Backend *AP_Compass_HMC5843::probe_mpu6000(enum Rotation rotation)
 {
     AP_InertialSensor &ins = *AP_InertialSensor::get_instance();
 
@@ -141,7 +139,7 @@ AP_Compass_Backend *AP_Compass_HMC5843::probe_mpu6000(Compass &compass, enum Rot
         return nullptr;
     }
 
-    AP_Compass_HMC5843 *sensor = new AP_Compass_HMC5843(compass, bus, false, rotation);
+    AP_Compass_HMC5843 *sensor = new AP_Compass_HMC5843(bus, false, rotation);
     if (!sensor || !sensor->init()) {
         delete sensor;
         return nullptr;
@@ -168,7 +166,6 @@ bool AP_Compass_HMC5843::init()
     }
 
     if (!_check_whoami()) {
-        hal.console->printf("HMC5843: not a HMC device\n");
         goto errout;
     }
 
@@ -259,19 +256,24 @@ void AP_Compass_HMC5843::_timer()
     // correct raw_field for known errors
     correct_field(raw_field, _compass_instance);
     
-    if (_sem->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        _mag_x_accum += raw_field.x;
-        _mag_y_accum += raw_field.y;
-        _mag_z_accum += raw_field.z;
-        _accum_count++;
-        if (_accum_count == 14) {
-            _mag_x_accum /= 2;
-            _mag_y_accum /= 2;
-            _mag_z_accum /= 2;
-            _accum_count = 7;
-        }
-        _sem->give();
+    if (!field_ok(raw_field)) {
+        return;
     }
+
+    if (!_sem->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        return; 
+    }
+    _mag_x_accum += raw_field.x;
+    _mag_y_accum += raw_field.y;
+    _mag_z_accum += raw_field.z;
+    _accum_count++;
+    if (_accum_count == 14) {
+        _mag_x_accum /= 2;
+        _mag_y_accum /= 2;
+        _mag_z_accum /= 2;
+        _accum_count = 7;
+    }
+    _sem->give();
 }
 
 /*
