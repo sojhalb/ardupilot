@@ -1,6 +1,8 @@
 #pragma once
 #include "Plane.h"
 #include <math.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_HAL/AP_HAL.h>
 
 /*
 STILL LEFT TODO:
@@ -38,8 +40,32 @@ double Glider_Range_lng = 0.5;                                        //Temp val
 double Glider_Range_alt = 0.5;                                        //Temp values
 
 
-// WIP
-int Is_Triggered_Glider(){
+/**
+  Function will check for input on specified channel and print
+  PWM value onto console
+
+  Idea for one channel. Need to double check
+
+  @param channel_num channel number to be checked
+  @return 0 if no input. 1 Otherwise
+
+**/
+int Is_Triggered_Glider(uint8_t channel_num){
+
+  int is_triggered = 0;
+
+  //read from the channel and print the pwm value
+  uint16_t input = hal.rcin->read(channel_num);
+  hal.console->printf("PWM: %u", input);
+
+  //check value of channel (what to compare the values with?)
+  if(input == true) {    // will need to change this
+    is_triggered = false;
+  }
+
+
+  return is_triggered;
+
 
 }
 
