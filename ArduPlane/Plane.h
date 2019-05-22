@@ -773,7 +773,7 @@ private:
 #endif // CONFIG_HAL_BOARD
     
 
-    void Object_Release(void);
+    void Object_Release(void);  //Test for Scheduler
 
 
     void adjust_nav_pitch_throttle(void);
