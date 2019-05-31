@@ -8,6 +8,11 @@
 #include <AP_HAL/AP_HAL.h>
 
 #define OUTPUTCH 4
+#define NUMCHANNELS = 10;   // tbd
+
+
+int last_value[NUMCHANNELS];                  //Tracks PWM values. Number of channels unknown
+
 /*
 STILL LEFT TODO:
     -calculate ideal drop location + get lat/lng/alt values every loop
@@ -46,34 +51,10 @@ double Glider_Range_alt = 0.5;                                        //Temp val
 
 <<<<<<< HEAD
 
-/**
-  Function will check for input on specified channel and print
-  PWM value onto console
-
-  Idea for one channel. Need to double check
-
-  @param channel_num channel number to be checked
-  @return 0 if no input. 1 Otherwise
-
-**/
-int Is_Triggered_Glider(uint8_t channel_num){
-
-  int is_triggered = 0;
-
-  //read from the channel and print the pwm value
-  uint16_t input = hal.rcin->read(channel_num);
-  hal.console->printf("PWM: %u", input);
-
-  //check value of channel (what to compare the values with?)
-  if(input == true) {    // will need to change this
-    is_triggered = false;
-  }
 
 
-  return is_triggered;
 
 
-}
 
 =======
 >>>>>>> 081fda336c46ba479fbc36a212a934759880e1c7
@@ -134,9 +115,55 @@ void Plane::Nerf_Release_Service(double Drop_lat_Position, double Drop_lng_Posit
 // WIP
 const AP_HAL::HAL& = AP_HAL::get_HAL();
 
-int Is_Triggered_Glider(){
 
+/**
+  Sets initial values in "last_value" array to -1
+**/
+void init_array(){
+  for(int i = 0 ; i < NUMCHANNELS; i++){
+
+    //setting default values in array
+    last_value[i] = -1;
+  }
 }
+
+
+/**
+  Function reads PWM value from channel and compares with the previous value read
+  from the same channel. Checks for changes in the channel
+
+  @param channel_num channel number to be checked
+  @return 0 if no input. 1 Otherwise
+
+**/
+
+
+int Is_Triggered_Glider(uint8_t channel_num){
+
+  //error checking
+  if((channel_num >= NUMCHANNELS)|| (channel_num < 0)){
+    hal.console->printf("Object_Drop::Is_Triggered_Glider| Invalid input \n");
+  }
+
+  int is_triggered = 1;
+
+  //read from the channel and print the pwm value
+  uint16_t input = hal.rcin->read(channel_num);
+  hal.console->printf("Object_Drop::Is_Triggered_Glider| PWM - %u", input);
+
+  //check value of channel and set to false if no changes
+  if(input == last_value[channel_num]) {
+    is_triggered = 0;
+  }
+
+  //save the new value if changed
+  else{
+    last_value[channel_num] == input;
+  }
+
+  return is_triggered;
+}
+
 void Object_Release(){
     hal.rcout->enable_ch(OUTPUTCH);
     hal.rcout->write(OUTPUTCH, 1500);
@@ -213,5 +240,5 @@ void Plane::update_drop_glider ()
 }
 
 void calculate_new_drop_location(){
-    
+
 }
