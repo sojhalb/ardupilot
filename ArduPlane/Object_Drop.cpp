@@ -1,11 +1,12 @@
-#pragma once
 #include "Plane.h"
 #include <math.h>
-#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/HAL.h>
 
-#define OUTPUTCH 4
+#define OUTPUTCH 5
+#define INPUTCH 6
 
-const AP_HAL::HAL& hal = AP_HAL::get_HAL();
+static uint16_t output_last_value = -1;
+
 
 static uint16_t pwm = 1500;
 static int8_t delta = 1;
@@ -15,16 +16,35 @@ void Plane::Object_Release(){
     hal.rcout->enable_ch(OUTPUTCH);
 
     hal.rcout->write(OUTPUTCH, pwm);
-    pwm += delta;
-
-    if (delta > 0 && pwm >= 2000) {
-        delta = -1;
-    } else if (delta < 0 && pwm <= 1000) {
-        delta = 1;
+    
+    if (Is_Triggered_Glider()){
+        pwm = 1000;
     }
 
-    hal.scheduler->delay(5);
-
+    if (pwm >= 2000) {
+        //do nothing    
+    } else {
+        pwm += delta;
+    }
 }
 
-AP_HAL_MAIN();
+int Is_Triggered_Glider(){
+//returns 1 if triggered and 0 if not triggered
+
+  int is_triggered = 0;
+
+  //read from the channel and print the pwm value
+  uint16_t input = hal.rcin->read(INPUTCH);
+
+  //check value of channel and set to true if there are changes
+  if (output_last_value == -1){
+      output_last_value == input;
+  }
+
+  if (input != ouput_last_value) {
+    output_last_value == input;
+    is_triggered = 1;
+  }
+  
+  return is_triggered;
+}
