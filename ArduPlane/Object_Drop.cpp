@@ -11,6 +11,8 @@ static uint16_t output_last_value = -1;
 static uint16_t pwm = 1500;
 static int8_t delta = 1;
 
+int Is_Triggered_Glider();
+
 void Plane::Object_Release(){
 
     hal.rcout->enable_ch(OUTPUTCH);
@@ -38,11 +40,11 @@ int Is_Triggered_Glider(){
 
   //check value of channel and set to true if there are changes
   if (output_last_value == -1){
-      output_last_value == input;
+      output_last_value = input;
   }
 
-  if (input != ouput_last_value) {
-    output_last_value == input;
+  if (input != output_last_value) {
+    output_last_value = input;
     is_triggered = 1;
   }
   
