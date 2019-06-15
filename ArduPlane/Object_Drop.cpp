@@ -18,7 +18,7 @@ void Plane::Object_Release(){
     hal.rcout->enable_ch(OUTPUTCH);
 uint16_t input = hal.rcin->read(INPUTCH);
 
-    hal.rcout->write(OUTPUTCH, input);
+    hal.rcout->write(OUTPUTCH, pwm);
 
     if (Is_Triggered_Glider()){
         pwm = 1000;
