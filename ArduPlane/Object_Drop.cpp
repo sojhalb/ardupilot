@@ -20,7 +20,6 @@ uint16_t input = hal.rcin->read(INPUTCH);
 
     hal.rcout->write(OUTPUTCH, input);
 
-    /*
     if (Is_Triggered_Glider()){
         pwm = 1000;
     }
@@ -30,7 +29,6 @@ uint16_t input = hal.rcin->read(INPUTCH);
     } else {
         pwm += delta;
     }
-    */
 }
 
 int Is_Triggered_Glider(){
@@ -42,13 +40,8 @@ int Is_Triggered_Glider(){
   uint16_t input = hal.rcin->read(INPUTCH);
 
   //check value of channel and set to true if there are changes
-  if (output_last_value == -1){
-      output_last_value = input;
-  }
-
-  if (input != output_last_value) {
-    output_last_value = input;
-    is_triggered = 1;
+  if (input > 1750){
+      is_triggered = 1;
   }
   
   return is_triggered;
