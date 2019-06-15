@@ -1,26 +1,18 @@
 #pragma once
 #include "Plane.h"
 #include <math.h>
-<<<<<<< HEAD
-#include <AP_Common/AP_Common.h>
-=======
->>>>>>> 081fda336c46ba479fbc36a212a934759880e1c7
 #include <AP_HAL/AP_HAL.h>
 
 #define OUTPUTCH 4
-#define NUMCHANNELS = 10;   // tbd
+#define INPUTCH = 6;   
 
-
-int last_value[NUMCHANNELS];                  //Tracks PWM values. Number of channels unknown
+                                    //Tracks PWM values. Number of channels unknown
 
 /*
 STILL LEFT TODO:
-    -calculate ideal drop location + get lat/lng/alt values every loop
-        -Create a drop Location location (class)
+    -find where to access the plane variables
         -**wind
-    -set defininte ranges (or create a function to vary ranges)
     -Add everything to plane.h + scheduler
-    -Generate waypoint on Ardupilot
 */
 
 /* Testing out RC INPUTOUTPUT
@@ -49,15 +41,6 @@ double Glider_Range_lat = 0.5;                                        //Temp val
 double Glider_Range_lng = 0.5;                                        //Temp values
 double Glider_Range_alt = 0.5;                                        //Temp values
 
-<<<<<<< HEAD
-
-
-
-
-
-
-=======
->>>>>>> 081fda336c46ba479fbc36a212a934759880e1c7
 void Fill_Water_Bottle_Config(AP_Gripper &Water_Bottle){
     Water_Bottle.backend = Water_Bottle_Gripper_Backend;
     Water_Bottle.config.type = 1;
@@ -109,70 +92,69 @@ void Plane::Nerf_Release_Service(double Drop_lat_Position, double Drop_lng_Posit
     }
 }
 */
-//Starting Point?
-//have to change code to make water, nerf, and glider known to program
 
-// WIP
-const AP_HAL::HAL& = AP_HAL::get_HAL();
-
-
-/**
-  Sets initial values in "last_value" array to -1
-**/
-void init_array(){
-  for(int i = 0 ; i < NUMCHANNELS; i++){
-
-    //setting default values in array
-    last_value[i] = -1;
-  }
-}
-
-
-/**
-  Function reads PWM value from channel and compares with the previous value read
-  from the same channel. Checks for changes in the channel
-
-  @param channel_num channel number to be checked
-  @return 0 if no input. 1 Otherwise
-
-**/
 
 
 int Is_Triggered_Glider(uint8_t channel_num){
+//returns 1 if triggered and 0 if not triggered
 
-  //error checking
-  if((channel_num >= NUMCHANNELS)|| (channel_num < 0)){
-    hal.console->printf("Object_Drop::Is_Triggered_Glider| Invalid input \n");
-  }
-
-  int is_triggered = 1;
+  int is_triggered = 0;
 
   //read from the channel and print the pwm value
-  uint16_t input = hal.rcin->read(channel_num);
-  hal.console->printf("Object_Drop::Is_Triggered_Glider| PWM - %u", input);
+  uint16_t input = hal.rcin->read(INPUTCH);
 
-  //check value of channel and set to false if no changes
-  if(input == last_value[channel_num]) {
-    is_triggered = 0;
-  }
-
-  //save the new value if changed
-  else{
-    last_value[channel_num] == input;
+  //check value of channel and set to true if there are changes
+  if (input > 1750){
+      is_triggered = 1;
   }
 
   return is_triggered;
 }
 
+
+
 void Object_Release(){
     hal.rcout->enable_ch(OUTPUTCH);
     hal.rcout->write(OUTPUTCH, 1500);
-    hal.scheduler->delay(5);
 }
 
+void Plane::control_sequence ()
+{
+    calculate_new_drop_location();
+}
+
+void calculate_new_drop_location(){
+    int lat1 = getLatitude();
+	int lon1 = getLatitude();
+	int lat2 = getLocationLatitude(); 
+	int lon2 = getLocationLong();
+	int airspeed = getAirspeed();
+	int altitude = getAltitude();
+	
+	// finding distance
+	int distance_different;
+	// to radians = degree * pi/180
+	int earth_radius = 6378137;
+	int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
+	
+	// radius of target circle
+	int radius = 30;
+	
+	// distance that the dropped thing will land
+	int time = root(altitude/4.9)
+	double object_distance = airspeed * time
+
+	// if needs to be dropped or not
+	if( ((d - object_distance) < radius ) && ((d - object_distance) < (radius*-1) ){
+		Object_Release();
+	}
+}
 
 enum state_e {IDLE, ARMED};
 
+
+
+/* 
 void Plane::control_sequence ()
 {
     static state_e state = IDLE;
@@ -197,7 +179,7 @@ void Plane::control_sequence ()
                 if(current_loc.alt > 50)   //50 feet
                 {
                     Object_Release();
-                    //Gripper_Release_Service(/*Need to input waypoint Locations*/, Glider_Gripper);
+                    //Gripper_Release_Service(/*Need to input waypoint Locations, Glider_Gripper);
                 }
             }
             /* Testing out RC INPUTOUTPUT
@@ -215,13 +197,11 @@ void Plane::control_sequence ()
                     Gripper_Release_Service(//Need to input waypoint Locations, Nerf_Gripper);
                 }
             }
-            */
+            
             break;
     }
 }
-void Set_Water_Bottle_Release_Waypoint(){
-
-}
+*/
 
 void Plane::update_drop_water ()
 {
@@ -239,6 +219,3 @@ void Plane::update_drop_glider ()
         glider.is_drop = true;
 }
 
-void calculate_new_drop_location(){
-
-}
