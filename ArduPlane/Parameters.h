@@ -75,6 +75,7 @@ public:
         k_param_throttle_nudge,
         k_param_alt_offset,
         k_param_ins,                // libraries/AP_InertialSensor variables
+        k_param_start_glider_button,    //Added for Plane Drop!
         k_param_takeoff_throttle_min_speed,
         k_param_takeoff_throttle_min_accel,
         k_param_takeoff_heading_hold, // unused
@@ -468,6 +469,7 @@ public:
     AP_Int8 flap_2_speed;
     AP_Int8 takeoff_flap_percent;  
     AP_Int8 stick_mixing;
+    AP_Int8 start_glider_button;
     AP_Float takeoff_throttle_min_speed;
     AP_Float takeoff_throttle_min_accel;
     AP_Int8 takeoff_throttle_delay;

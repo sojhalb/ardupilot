@@ -116,6 +116,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @Values: 0:Disabled,42:Enabled
     // @User: Advanced
     GSCALAR(auto_fbw_steer,          "AUTO_FBW_STEER",   0),
+    
+    // @Param: START_GLDR_BTN
+    // @DisplayName: Start glider button
+    // @Description: Plane will not start until button is pressed, will be armed but no motion from any component.
+    // @Values: 0:Disabled,1:DoNotStart,2:Start
+    // @User: User
+    GSCALAR(start_glider_button,    "START_GLDR_BTN", 0),
 
     // @Param: TKOFF_THR_MINSPD
     // @DisplayName: Takeoff throttle min speed
