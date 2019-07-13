@@ -1,9 +1,14 @@
 #include "Plane.h"
+#include <AP_Common/AP_Common.h>
 #include <math.h>
 #include <AP_HAL/AP_HAL.h>
 
 #define OUTPUTCH 4
-#define INPUTCH = 6;   
+
+void Object_Release();
+void Object_Not_Release();
+
+//#define INPUTCH = 6;   
 
                                     //Tracks PWM values. Number of channels unknown
 
@@ -42,7 +47,7 @@ void Object_Not_Release(){
 
 
 void Plane::calculate_new_drop_location(){
-    if(next_WP_Loc.lat != 0 && next_WP_Loc.lon != 0){
+    if(next_WP_loc.lat != 0 && next_WP_loc.lng != 0){
         /* 
         int lat1 = current_location.lat;
         int lon1 = current_location.lon;
@@ -104,7 +109,7 @@ void Plane::control_sequence ()
                 if(current_loc.alt > 50)   //50 feet
                 {
                     Object_Release();
-                    //Gripper_Release_Service(/*Need to input waypoint Locations, Glider_Gripper);
+                    Gripper_Release_Service(Need to input waypoint Locations, Glider_Gripper);
                 }
             }
             /* Testing out RC INPUTOUTPUT
@@ -127,6 +132,7 @@ void Plane::control_sequence ()
     }
 }
 */
+
 /* 
 void Plane::update_drop_water ()
 {
@@ -143,4 +149,4 @@ void Plane::update_drop_glider ()
     if(glider.is_drop == false)
         glider.is_drop = true;
 }
-*?
+*/

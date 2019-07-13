@@ -32,6 +32,8 @@
  */
 const AP_Scheduler::Task Plane::scheduler_tasks[] = {
                            // Units:   Hz      us
+
+    SCHED_TASK(calculate_new_drop_location, 400,200),
     SCHED_TASK(ahrs_update,           400,    400),
     SCHED_TASK(read_radio,             50,    100),
     SCHED_TASK(check_short_failsafe,   50,    100),
