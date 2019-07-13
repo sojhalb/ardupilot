@@ -1,4 +1,3 @@
-#pragma once
 #include "Plane.h"
 #include <math.h>
 #include <AP_HAL/AP_HAL.h>
@@ -118,39 +117,44 @@ void Object_Release(){
     hal.rcout->write(OUTPUTCH, 1500);
 }
 
+/*
 void Plane::control_sequence ()
 {
     calculate_new_drop_location();
 }
+*/
 
-void calculate_new_drop_location(){
-    int lat1 = getLatitude();
-	int lon1 = getLatitude();
-	int lat2 = getLocationLatitude(); 
-	int lon2 = getLocationLong();
-	int airspeed = getAirspeed();
-	int altitude = getAltitude();
-	
-	// finding distance
-	int distance_different;
-	// to radians = degree * pi/180
-	int earth_radius = 6378137;
-	int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
-	
-	// radius of target circle
-	int radius = 30;
-	
-	// distance that the dropped thing will land
-	int time = root(altitude/4.9)
-	double object_distance = airspeed * time
+void Plane::calculate_new_drop_location(){
+    if(current_location.lat != 0 && current_location.lon != 0 && current_location.alt != 0){
 
-	// if needs to be dropped or not
-	if( ((d - object_distance) < radius ) && ((d - object_distance) < (radius*-1) ){
-		Object_Release();
-	}
+        int lat1 = current_location.lat;
+        int lon1 = current_location.lon;
+        int lat2 = next_WP_Loc.lat; 
+        int lon2 = next_WP_loc.lon;
+        int airspeed = airspeed.get_airspeed();
+        int altitude = current_location.alt
+
+        // finding distance
+        int distance_different;
+        // to radians = degree * pi/180
+        int earth_radius = 6378137;
+        int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
+
+        // radius of target circle
+        int radius = 30;
+
+        // distance that the dropped thing will land
+        int time = root(altitude/4.9)
+        double object_distance = airspeed * time
+
+        // if needs to be dropped or not
+        if( ( ((d - object_distance) < radius ) && ((d - object_distance) < (radius*-1)) || Is_Triggered_Glider() ){
+        Object_Release();
+        }
+    }
 }
 
-enum state_e {IDLE, ARMED};
+//enum state_e {IDLE, ARMED};
 
 
 
@@ -202,7 +206,7 @@ void Plane::control_sequence ()
     }
 }
 */
-
+/* 
 void Plane::update_drop_water ()
 {
     if(water.is_drop == false)
@@ -218,4 +222,4 @@ void Plane::update_drop_glider ()
     if(glider.is_drop == false)
         glider.is_drop = true;
 }
-
+*?
