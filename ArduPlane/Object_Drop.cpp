@@ -29,23 +29,21 @@ int Is_Triggered_Glider(uint8_t channel_num){
   return is_triggered;
 }
 
-
+*/
 
 void Object_Release(){
     hal.rcout->enable_ch(OUTPUTCH);
-    hal.rcout->write(OUTPUTCH, 1500);
+    hal.rcout->write(OUTPUTCH, 1800);
+}
+void Object_Not_Release(){
+    hal.rcout->enable_ch(OUTPUTCH);
+    hal.rcout->write(OUTPUTCH, 1200);
 }
 
-/*
-void Plane::control_sequence ()
-{
-    calculate_new_drop_location();
-}
-*/
 
 void Plane::calculate_new_drop_location(){
-    if(current_location.lat != 0 && current_location.lon != 0 && current_location.alt != 0){
-
+    if(next_WP_Loc.lat != 0 && next_WP_Loc.lon != 0){
+        /* 
         int lat1 = current_location.lat;
         int lon1 = current_location.lon;
         int lat2 = next_WP_Loc.lat; 
@@ -70,6 +68,10 @@ void Plane::calculate_new_drop_location(){
         if( ( ((d - object_distance) < radius ) && ((d - object_distance) < (radius*-1)) || Is_Triggered_Glider() ){
         Object_Release();
         }
+        */
+       Object_Release();
+    }else {
+        Object_Not_Release();
     }
 }
 
