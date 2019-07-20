@@ -1,14 +1,11 @@
 #include "Plane.h"
-#include <AP_Common/AP_Common.h>
+#include "AP_Common.h"
 #include <math.h>
 #include <AP_HAL/AP_HAL.h>
+#include "location.cpp"
 
 #define OUTPUTCH 4
-
-void Object_Release();
-void Object_Not_Release();
-
-//#define INPUTCH = 6;   
+#define INPUTCH 6;   
 
                                     //Tracks PWM values. Number of channels unknown
 
@@ -45,10 +42,9 @@ void Object_Not_Release(){
     hal.rcout->write(OUTPUTCH, 1200);
 }
 
-
 void Plane::calculate_new_drop_location(){
-    if(next_WP_loc.lat != 0 && next_WP_loc.lng != 0){
-        /* 
+    if(next_WP_loc.lat != 0 && next_WP_loc.lon != 0){
+
         int lat1 = current_location.lat;
         int lon1 = current_location.lon;
         int lat2 = next_WP_Loc.lat; 
@@ -57,10 +53,12 @@ void Plane::calculate_new_drop_location(){
         int altitude = current_location.alt
 
         // finding distance
-        int distance_different;
+
         // to radians = degree * pi/180
         int earth_radius = 6378137;
-        int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
+        //int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
+        float d = get_distance(current_location, next_WP_loc);
+        
 
         // radius of target circle
         int radius = 30;
@@ -73,8 +71,6 @@ void Plane::calculate_new_drop_location(){
         if( ( ((d - object_distance) < radius ) && ((d - object_distance) < (radius*-1)) || Is_Triggered_Glider() ){
         Object_Release();
         }
-        */
-       Object_Release();
     }else {
         Object_Not_Release();
     }
@@ -109,7 +105,7 @@ void Plane::control_sequence ()
                 if(current_loc.alt > 50)   //50 feet
                 {
                     Object_Release();
-                    Gripper_Release_Service(Need to input waypoint Locations, Glider_Gripper);
+                    //Gripper_Release_Service(/*Need to input waypoint Locations, Glider_Gripper);
                 }
             }
             /* Testing out RC INPUTOUTPUT
@@ -132,7 +128,6 @@ void Plane::control_sequence ()
     }
 }
 */
-
 /* 
 void Plane::update_drop_water ()
 {
