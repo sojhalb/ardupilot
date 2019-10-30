@@ -1,4 +1,6 @@
 #include <AP_HAL_F4Light/hardware/hal/syscalls.h>
+#include <AP_HAL_F4Light/params.h>
+#include <AP_HAL_F4Light/wirish/boards.h>
 
 #define HAL_NEEDS_PARAM_HELPER
 
@@ -35,7 +37,7 @@
 
 
 #ifdef BOARD_BUZZER_PIN
-#define BUZZER_PIN                      BOARD_BUZZER_PIN
+#define HAL_BUZZER_PIN                  BOARD_BUZZER_PIN
 #endif
 
 # define PUSHBUTTON_PIN                 BOARD_PUSHBUTTON_PIN
@@ -51,7 +53,8 @@
 #define TOSHIBA_LED_I2C_BUS  2       // external I2C
 
 
- #define HAL_MINIMIZE_FEATURES 1
+#define HAL_MINIMIZE_FEATURES 1
+#define DEVO_TELEM_ENABLED ENABLED
 
  #define AC_TERRAIN             DISABLED // no SD card with POSIX IO
  #define PRECISION_LANDING      DISABLED
@@ -60,6 +63,7 @@
  #define EPM_ENABLED            DISABLED
  #define CLI_ENABLED            DISABLED
  #define GRIPPER_ENABLED        DISABLED // not for large quads
+ #define WINCH_ENABLED          DISABLED
  
  
  // disable for debugging with -O0
@@ -69,5 +73,17 @@
 // #define MOUNT                 DISABLED 
 // #define ADSB_ENABLED          DISABLED
 
-
  #define LOGGING_ENABLED ENABLED
+
+ // exclude some useless modes 
+ #define MODE_SPORT_ENABLED DISABLE
+ #define MODE_DRIFT_ENABLED DISABLE
+ #define MODE_BRAKE_ENABLED DISABLE
+ #define MODE_GUIDED_NOGPS_ENABLED DISABLE
+ 
+ 
+#define STATS_ENABLED DISABLED // to reduce flash degradation
+
+#include <AP_HAL_F4Light/Semaphores.h>
+#define HAL_Semaphore F4Light::Semaphore
+

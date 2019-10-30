@@ -23,18 +23,48 @@
 #include <AP_HAL_Empty/AP_HAL_Empty_Private.h>
 #include <AP_HAL_ChibiOS/AP_HAL_ChibiOS_Private.h>
 #include "shared_dma.h"
+#include "sdcard.h"
+#include "hwdef/common/usbcfg.h"
+#include "hwdef/common/stm32_util.h"
 
 #include <hwdef.h>
 
+#ifndef HAL_NO_UARTDRIVER
 static HAL_UARTA_DRIVER;
 static HAL_UARTB_DRIVER;
 static HAL_UARTC_DRIVER;
 static HAL_UARTD_DRIVER;
 static HAL_UARTE_DRIVER;
 static HAL_UARTF_DRIVER;
+static HAL_UARTG_DRIVER;
+#else
+static Empty::UARTDriver uartADriver;
+static Empty::UARTDriver uartBDriver;
+static Empty::UARTDriver uartCDriver;
+static Empty::UARTDriver uartDDriver;
+static Empty::UARTDriver uartEDriver;
+static Empty::UARTDriver uartFDriver;
+static Empty::UARTDriver uartGDriver;
+#endif
+
+#if HAL_USE_I2C == TRUE
 static ChibiOS::I2CDeviceManager i2cDeviceManager;
+#else
+static Empty::I2CDeviceManager i2cDeviceManager;
+#endif
+
+#if HAL_USE_SPI == TRUE
 static ChibiOS::SPIDeviceManager spiDeviceManager;
+#else
+static Empty::SPIDeviceManager spiDeviceManager;
+#endif
+
+#if HAL_USE_ADC == TRUE
 static ChibiOS::AnalogIn analogIn;
+#else
+static Empty::AnalogIn analogIn;
+#endif
+
 #ifdef HAL_USE_EMPTY_STORAGE
 static Empty::Storage storageDriver;
 #else
@@ -42,13 +72,17 @@ static ChibiOS::Storage storageDriver;
 #endif
 static ChibiOS::GPIO gpioDriver;
 static ChibiOS::RCInput rcinDriver;
+
+#if HAL_USE_PWM == TRUE
 static ChibiOS::RCOutput rcoutDriver;
+#else
+static Empty::RCOutput rcoutDriver;
+#endif
+
 static ChibiOS::Scheduler schedulerInstance;
 static ChibiOS::Util utilInstance;
 static Empty::OpticalFlow opticalFlowDriver;
-#ifdef USE_POSIX
-static FATFS SDC_FS; // FATFS object
-#endif
+
 
 #if HAL_WITH_IO_MCU
 HAL_UART_IO_DRIVER;
@@ -64,6 +98,7 @@ HAL_ChibiOS::HAL_ChibiOS() :
         &uartDDriver,
         &uartEDriver,
         &uartFDriver,
+        &uartGDriver,
         &i2cDeviceManager,
         &spiDeviceManager,
         &analogIn,
@@ -91,10 +126,12 @@ extern const AP_HAL::HAL& hal;
 void hal_chibios_set_priority(uint8_t priority)
 {
     chSysLock();
+#if CH_CFG_USE_MUTEXES == TRUE
     if ((daemon_task->prio == daemon_task->realprio) || (priority > daemon_task->prio)) {
       daemon_task->prio = priority;
     }
     daemon_task->realprio = priority;
+#endif
     chSchRescheduleS();
     chSysUnlock();
 }
@@ -105,9 +142,15 @@ thread_t* get_main_thread()
 }
 
 static AP_HAL::HAL::Callbacks* g_callbacks;
-static THD_FUNCTION(main_loop,arg)
+
+static void main_loop()
 {
     daemon_task = chThdGetSelfX();
+
+    /*
+      switch to high priority for main loop
+     */
+    chThdSetPriority(APM_MAIN_PRIORITY);
 
 #ifdef HAL_I2C_CLEAR_BUS
     // Clear all I2C Buses. This can be needed on some boards which
@@ -115,9 +158,21 @@ static THD_FUNCTION(main_loop,arg)
     ChibiOS::I2CBus::clear_all();
 #endif
 
+#if STM32_DMA_ADVANCED
     ChibiOS::Shared_DMA::init();
-    
+#endif
+    peripheral_power_enable();
+        
     hal.uartA->begin(115200);
+
+#ifdef HAL_SPI_CHECK_CLOCK_FREQ
+    // optional test of SPI clock frequencies
+    ChibiOS::SPIDevice::test_clock_freq();
+#endif 
+
+    //Setup SD Card and Initialise FATFS bindings
+    sdcard_init();
+
     hal.uartB->begin(38400);
     hal.uartC->begin(57600);
     hal.analogin->init();
@@ -135,7 +190,8 @@ static THD_FUNCTION(main_loop,arg)
     hal.scheduler->system_initialized();
 
     thread_running = true;
-    daemon_task->name = SKETCHNAME;
+    chRegSetThreadName(SKETCHNAME);
+    
     /*
       switch to high priority for main loop
      */
@@ -145,10 +201,16 @@ static THD_FUNCTION(main_loop,arg)
         g_callbacks->loop();
 
         /*
-          give up 250 microseconds of time, to ensure drivers get a
-          chance to run.
+          give up 250 microseconds of time if the INS loop hasn't
+          called delay_microseconds_boost(), to ensure low priority
+          drivers get a chance to run. Calling
+          delay_microseconds_boost() means we have already given up
+          time from the main loop, so we don't need to do it again
+          here
          */
-        hal.scheduler->delay_microseconds(250);
+        if (!schedulerInstance.check_called_boost()) {
+            hal.scheduler->delay_microseconds(250);
+        }
     }
     thread_running = false;
 }
@@ -162,7 +224,12 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
      * - Kernel initialization, the main() function becomes a thread and the
      *   RTOS is active.
      */
-    hrt_init();
+
+#ifdef HAL_USB_PRODUCT_ID
+  setup_usb_strings();
+#endif
+    
+#ifdef HAL_STDOUT_SERIAL
     //STDOUT Initialistion
     SerialConfig stdoutcfg =
     {
@@ -172,39 +239,13 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
       0
     };
     sdStart((SerialDriver*)&HAL_STDOUT_SERIAL, &stdoutcfg);
-
-    //Setup SD Card and Initialise FATFS bindings
-    /*
-     * Start SD Driver
-     */
-#ifdef USE_POSIX
-    FRESULT err;
-    sdcStart(&SDCD1, NULL);
-
-    if(sdcConnect(&SDCD1) == HAL_FAILED) {
-        printf("Err: Failed to initialize SDIO!\n");
-    } else {
-        err = f_mount(&SDC_FS, "/", 1);
-        if (err != FR_OK) {
-            printf("Err: Failed to mount SD Card!\n");
-            sdcDisconnect(&SDCD1);
-        } else {
-            printf("Successfully mounted SDCard..\n");
-        }
-        //Create APM Directory
-        mkdir("/APM", 0777);
-    }
 #endif
+
     assert(callbacks);
     g_callbacks = callbacks;
 
-    void *main_thread_wa = hal.util->malloc_type(THD_WORKING_AREA_SIZE(APM_MAIN_THREAD_STACK_SIZE), AP_HAL::Util::MEM_FAST);
-    chThdCreateStatic(main_thread_wa,
-                      APM_MAIN_THREAD_STACK_SIZE,
-                      APM_MAIN_PRIORITY,     /* Initial priority.    */
-                      main_loop,             /* Thread function.     */
-                      nullptr);              /* Thread parameter.    */
-    chThdExit(0);
+    //Takeover main
+    main_loop();
 }
 
 const AP_HAL::HAL& AP_HAL::get_HAL() {

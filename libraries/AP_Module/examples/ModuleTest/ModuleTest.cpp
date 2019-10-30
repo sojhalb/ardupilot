@@ -2,7 +2,6 @@
 // Simple test for the AP_AHRS interface
 //
 
-#include <AP_ADC/AP_ADC.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Module/AP_Module.h>
@@ -19,7 +18,7 @@ static AP_Baro baro;
 static AP_SerialManager serial_manager;
 
 // choose which AHRS system to use
-static AP_AHRS_DCM ahrs{ins, baro};
+static AP_AHRS_DCM ahrs{};
 
 void setup(void)
 {

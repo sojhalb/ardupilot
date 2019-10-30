@@ -1,33 +1,13 @@
 #include "Copter.h"
 
-void Copter::init_barometer(bool full_calibration)
-{
-    gcs().send_text(MAV_SEVERITY_INFO, "Calibrating barometer");
-    if (full_calibration) {
-        barometer.calibrate();
-    }else{
-        barometer.update_calibration();
-    }
-    gcs().send_text(MAV_SEVERITY_INFO, "Barometer calibration complete");
-}
-
 // return barometric altitude in centimeters
 void Copter::read_barometer(void)
 {
     barometer.update();
-    if (should_log(MASK_LOG_IMU)) {
-        Log_Write_Baro();
-    }
+
     baro_alt = barometer.get_altitude() * 100.0f;
-    baro_climbrate = barometer.get_climb_rate() * 100.0f;
 
     motors->set_air_density_ratio(barometer.get_air_density_ratio());
-}
-
-// try to accumulate a baro reading
-void Copter::barometer_accumulate(void)
-{
-    barometer.accumulate();
 }
 
 void Copter::init_rangefinder(void)
@@ -95,12 +75,14 @@ bool Copter::rangefinder_alt_ok()
  */
 void Copter::rpm_update(void)
 {
+#if RPM_ENABLED == ENABLED
     rpm_sensor.update();
     if (rpm_sensor.enabled(0) || rpm_sensor.enabled(1)) {
         if (should_log(MASK_LOG_RCIN)) {
             DataFlash.Log_Write_RPM(rpm_sensor);
         }
     }
+#endif
 }
 
 // initialise compass
@@ -120,17 +102,10 @@ void Copter::init_compass()
 }
 
 /*
-  if the compass is enabled then try to accumulate a reading
-  also update initial location used for declination
+  initialise compass's location used for declination
  */
-void Copter::compass_accumulate(void)
+void Copter::init_compass_location()
 {
-    if (!g.compass_enabled) {
-        return;
-    }
-
-    compass.accumulate();
-
     // update initial location used for declination
     if (!ap.compass_init_location) {
         Location loc;
@@ -178,39 +153,6 @@ void Copter::update_optical_flow(void)
     }
 }
 #endif  // OPTFLOW == ENABLED
-
-// read_battery - check battery voltage and current and invoke failsafe if necessary
-// called at 10hz
-void Copter::read_battery(void)
-{
-    battery.read();
-
-    // update motors with voltage and current
-    if (battery.get_type() != AP_BattMonitor_Params::BattMonitor_TYPE_NONE) {
-        motors->set_voltage(battery.voltage());
-    }
-
-    if (battery.has_current()) {
-        compass.set_current(battery.current_amps());
-
-        motors->set_current(battery.current_amps());
-        motors->set_resistance(battery.get_resistance());
-        motors->set_voltage_resting_estimate(battery.voltage_resting_estimate());
-    }
-
-    // check for low voltage or current if the low voltage check hasn't already been triggered
-    // we only check when we're not powered by USB to avoid false alarms during bench tests
-    if (!ap.usb_connected && !failsafe.battery && battery.exhausted(g.fs_batt_voltage, g.fs_batt_mah)) {
-        failsafe_battery_event();
-    }
-}
-
-// read the receiver RSSI as an 8 bit number for MAVLink
-// RC_CHANNELS_SCALED message
-void Copter::read_receiver_rssi(void)
-{
-    receiver_rssi = rssi.read_receiver_rssi_uint8();
-}
 
 void Copter::compass_cal_update()
 {
@@ -260,36 +202,12 @@ void Copter::accel_cal_update()
 #endif
 }
 
-#if GRIPPER_ENABLED == ENABLED
-// gripper update
-void Copter::gripper_update()
-{
-    g2.gripper.update();
-}
-#endif
-
-/*
-  update AP_Button
- */
-void Copter::button_update(void)
-{
-    g2.button.update();
-}
-
 // initialise proximity sensor
 void Copter::init_proximity(void)
 {
 #if PROXIMITY_ENABLED == ENABLED
     g2.proximity.init();
     g2.proximity.set_rangefinder(&rangefinder);
-#endif
-}
-
-// update proximity sensor
-void Copter::update_proximity(void)
-{
-#if PROXIMITY_ENABLED == ENABLED
-    g2.proximity.update();
 #endif
 }
 
@@ -331,26 +249,30 @@ void Copter::update_sensor_status_flags(void)
         control_sensors_present |= MAV_SYS_STATUS_LOGGING;
     }
 #if PROXIMITY_ENABLED == ENABLED
-    if (copter.g2.proximity.get_status() > AP_Proximity::Proximity_NotConnected) {
-        control_sensors_present |= MAV_SYS_STATUS_SENSOR_LASER_POSITION;
+    if (copter.g2.proximity.sensor_present()) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_PROXIMITY;
     }
 #endif
-    if (copter.battery.healthy()) {
-        control_sensors_present |= MAV_SYS_STATUS_SENSOR_BATTERY;
-    }
 #if AC_FENCE == ENABLED
     if (copter.fence.sys_status_present()) {
         control_sensors_present |= MAV_SYS_STATUS_GEOFENCE;
     }
 #endif
+#if RANGEFINDER_ENABLED == ENABLED
+    if (rangefinder.has_orientation(ROTATION_PITCH_270)) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_LASER_POSITION;
+    }
+#endif
 
-    // all present sensors enabled by default except altitude and position control and motors which we will set individually
+    // all sensors are present except these, which may be set as enabled below:
     control_sensors_enabled = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL &
                                                          ~MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL &
                                                          ~MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS &
                                                          ~MAV_SYS_STATUS_LOGGING &
                                                          ~MAV_SYS_STATUS_SENSOR_BATTERY &
-                                                         ~MAV_SYS_STATUS_GEOFENCE);
+                                                         ~MAV_SYS_STATUS_GEOFENCE &
+                                                         ~MAV_SYS_STATUS_SENSOR_LASER_POSITION &
+                                                         ~MAV_SYS_STATUS_SENSOR_PROXIMITY);
 
     switch (control_mode) {
     case AUTO:
@@ -388,12 +310,17 @@ void Copter::update_sensor_status_flags(void)
         control_sensors_enabled |= MAV_SYS_STATUS_LOGGING;
     }
 
-    if (g.fs_batt_voltage > 0 || g.fs_batt_mah > 0) {
+    if (battery.num_instances() > 0) {
         control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_BATTERY;
     }
 #if AC_FENCE == ENABLED
     if (copter.fence.sys_status_enabled()) {
         control_sensors_enabled |= MAV_SYS_STATUS_GEOFENCE;
+    }
+#endif
+#if PROXIMITY_ENABLED == ENABLED
+    if (copter.g2.proximity.sensor_enabled()) {
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_PROXIMITY;
     }
 #endif
 
@@ -445,8 +372,8 @@ void Copter::update_sensor_status_flags(void)
     }
 
 #if PROXIMITY_ENABLED == ENABLED
-    if (copter.g2.proximity.get_status() < AP_Proximity::Proximity_Good) {
-        control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_LASER_POSITION;
+    if (copter.g2.proximity.sensor_failed()) {
+        control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_PROXIMITY;
     }
 #endif
 
@@ -469,10 +396,9 @@ void Copter::update_sensor_status_flags(void)
 
 #if RANGEFINDER_ENABLED == ENABLED
     if (rangefinder_state.enabled) {
-        control_sensors_present |= MAV_SYS_STATUS_SENSOR_LASER_POSITION;
         control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_LASER_POSITION;
-        if (rangefinder.has_data_orient(ROTATION_PITCH_270)) {
-            control_sensors_health |= MAV_SYS_STATUS_SENSOR_LASER_POSITION;
+        if (!rangefinder_state.alt_healthy) {
+            control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_LASER_POSITION;
         }
     }
 #endif
@@ -483,8 +409,9 @@ void Copter::update_sensor_status_flags(void)
         control_sensors_health &= ~(MAV_SYS_STATUS_SENSOR_3D_GYRO | MAV_SYS_STATUS_SENSOR_3D_ACCEL);
     }
 
-    if (copter.failsafe.battery) {
-         control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_BATTERY;                                                                    }
+    if (!copter.battery.healthy() || copter.battery.has_failsafed()) {
+         control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_BATTERY;
+    }
 #if AC_FENCE == ENABLED
     if (copter.fence.sys_status_failed()) {
         control_sensors_health &= ~MAV_SYS_STATUS_GEOFENCE;
@@ -495,18 +422,6 @@ void Copter::update_sensor_status_flags(void)
     // give mask of error flags to Frsky_Telemetry
     frsky_telemetry.update_sensor_status_flags(~control_sensors_health & control_sensors_enabled & control_sensors_present);
 #endif
-}
-
-// init beacons used for non-gps position estimates
-void Copter::init_beacon()
-{
-    g2.beacon.init();
-}
-
-// update beacons
-void Copter::update_beacon()
-{
-    g2.beacon.update();
 }
 
 // init visual odometry sensor
@@ -543,18 +458,17 @@ void Copter::update_visual_odom()
 // winch and wheel encoder initialisation
 void Copter::winch_init()
 {
+#if WINCH_ENABLED == ENABLED
     g2.wheel_encoder.init();
     g2.winch.init(&g2.wheel_encoder);
+#endif
 }
 
 // winch and wheel encoder update
 void Copter::winch_update()
 {
+#if WINCH_ENABLED == ENABLED
     g2.wheel_encoder.update();
     g2.winch.update();
-}
-
-void Copter::temp_cal_update(void)
-{
-    g2.temp_calibration.update();
+#endif
 }

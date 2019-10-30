@@ -18,14 +18,6 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(format_version,         "FORMAT_VERSION", 0),
 
-    // @Param: SYSID_SW_TYPE
-    // @DisplayName: Software Type
-    // @Description: This is used by the ground station to recognise the software type (eg ArduPlane vs ArduCopter)
-    // @Values: 0:ArduPlane,4:AntennaTracker,10:Copter,20:Rover,40:ArduSub
-    // @User: Advanced
-    // @ReadOnly: True
-    GSCALAR(software_type,          "SYSID_SW_TYPE",  Parameters::k_software_type),
-
     // @Param: SYSID_THISMAV
     // @DisplayName: MAVLink system ID of this vehicle
     // @Description: Allows setting an individual MAVLink system id for this vehicle to distinguish it from others on the same network
@@ -124,6 +116,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @Values: 0:Disabled,42:Enabled
     // @User: Advanced
     GSCALAR(auto_fbw_steer,          "AUTO_FBW_STEER",   0),
+    
+    // @Param: START_GLDR_BTN
+    // @DisplayName: Start glider button
+    // @Description: Plane will not start until button is pressed, will be armed but no motion from any component.
+    // @Values: 0:Disabled,1:DoNotStart,2:Start
+    // @User: User
+    GSCALAR(start_glider_button,    "START_GLDR_BTN", 0),
 
     // @Param: TKOFF_THR_MINSPD
     // @DisplayName: Takeoff throttle min speed
@@ -181,9 +180,9 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: TKOFF_THR_SLEW
     // @DisplayName: Takeoff throttle slew rate
-    // @Description: This parameter sets the slew rate for the throttle during auto takeoff. When this is zero the THR_SLEWRATE parameter is used during takeoff. For rolling takeoffs it can be a good idea to set a lower slewrate for takeoff to give a slower acceleration which can improve ground steering control. The value is a percentage throttle change per second, so a value of 20 means to advance the throttle over 5 seconds on takeoff. Values below 20 are not recommended as they may cause the plane to try to climb out with too little throttle.
+    // @Description: This parameter sets the slew rate for the throttle during auto takeoff. When this is zero the THR_SLEWRATE parameter is used during takeoff. For rolling takeoffs it can be a good idea to set a lower slewrate for takeoff to give a slower acceleration which can improve ground steering control. The value is a percentage throttle change per second, so a value of 20 means to advance the throttle over 5 seconds on takeoff. Values below 20 are not recommended as they may cause the plane to try to climb out with too little throttle. A value of -1 means no limit on slew rate in takeoff.
     // @Units: %/s
-    // @Range: 0 127
+    // @Range: -1 127
     // @Increment: 1
     // @User: User
     GSCALAR(takeoff_throttle_slewrate, "TKOFF_THR_SLEW",  0),
@@ -530,22 +529,6 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Standard
     GSCALAR(fs_timeout_long,        "FS_LONG_TIMEOUT", 5),
 
-    // @Param: FS_BATT_VOLTAGE
-    // @DisplayName: Failsafe battery voltage
-    // @Description: Battery voltage to trigger failsafe. Set to 0 to disable battery voltage failsafe. If the battery voltage drops below this voltage continuously for 10 seconds then the plane will switch to RTL mode.
-    // @Units: V
-    // @Increment: 0.1
-    // @User: Standard
-    GSCALAR(fs_batt_voltage,        "FS_BATT_VOLTAGE", 0),
-
-    // @Param: FS_BATT_MAH
-    // @DisplayName: Failsafe battery milliAmpHours
-    // @Description: Battery capacity remaining to trigger failsafe. Set to 0 to disable battery remaining failsafe. If the battery remaining drops below this level then the plane will switch to RTL mode immediately.
-    // @Units: mA.h
-    // @Increment: 50
-    // @User: Standard
-    GSCALAR(fs_batt_mah,            "FS_BATT_MAH", 0),
-
     // @Param: FS_GCS_ENABL
     // @DisplayName: GCS failsafe enable
     // @Description: Enable ground control station telemetry failsafe. Failsafe will trigger after FS_LONG_TIMEOUT seconds of no MAVLink heartbeat messages. There are two possible enabled settings. Seeing FS_GCS_ENABL to 1 means that GCS failsafe will be triggered when the aircraft has not received a MAVLink HEARTBEAT message. Setting FS_GCS_ENABL to 2 means that GCS failsafe will be triggered on either a loss of HEARTBEAT messages, or a RADIO_STATUS message from a MAVLink enabled 3DR radio indicating that the ground station is not receiving status updates from the aircraft, which is indicated by the RADIO_STATUS.remrssi field being zero (this may happen if you have a one way link due to asymmetric noise on the ground station and aircraft radios).Setting FS_GCS_ENABL to 3 means that GCS failsafe will be triggered by Heartbeat(like option one), but only in AUTO mode. WARNING: Enabling this option opens up the possibility of your plane going into failsafe mode and running the motor on the ground it it loses contact with your ground station. If this option is enabled on an electric plane then you should enable ARMING_REQUIRED.
@@ -845,13 +828,6 @@ const AP_Param::Info Plane::var_info[] = {
     GSCALAR(override_safety,      "OVERRIDE_SAFETY",  1),
 #endif
 
-    // @Param: INVERTEDFLT_CH
-    // @DisplayName: Inverted flight channel
-    // @Description: A RC input channel number to enable inverted flight. If this is non-zero then the APM will monitor the corresponding RC input channel and will enable inverted flight when the channel goes above 1750.
-    // @Values: 0:Disabled,1:Channel1,2:Channel2,3:Channel3,4:Channel4,5:Channel5,6:Channel6,7:Channel7,8:Channel8
-    // @User: Standard
-    GSCALAR(inverted_flight_ch,     "INVERTEDFLT_CH", 0),
-
 #if HIL_SUPPORT
     // @Param: HIL_MODE
     // @DisplayName: HIL mode enable
@@ -971,7 +947,7 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(tuning,           "TUNE_", AP_Tuning_Plane),
     
     // @Group: Q_A_
-    // @Path: ../libraries/AC_AttitudeControl/AC_AttitudeControl_Multi.cpp
+    // @Path: ../libraries/AC_AttitudeControl/AC_AttitudeControl.cpp,../libraries/AC_AttitudeControl/AC_AttitudeControl_Multi.cpp
     { AP_PARAM_GROUP, "Q_A_", Parameters::k_param_q_attitude_control,
       (const void *)&plane.quadplane.attitude_control,
       {group_info : AC_AttitudeControl_Multi::var_info}, AP_PARAM_FLAG_POINTER },
@@ -1120,6 +1096,12 @@ const AP_Param::Info Plane::var_info[] = {
     // @Path: ../libraries/AP_Landing/AP_Landing.cpp
     GOBJECT(landing, "LAND_", AP_Landing),
 
+#if OSD_ENABLED
+    // @Group: OSD
+    // @Path: ../libraries/AP_OSD/AP_OSD.cpp
+    GOBJECT(osd, "OSD", AP_OSD),
+#endif
+    
     AP_VAREND
 };
 
@@ -1144,22 +1126,25 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Values: 0:NotEnforced,1:Enforced
     // @User: Advanced
     AP_GROUPINFO("SYSID_ENFORCE", 4, ParametersG2, sysid_enforce, 0),
-
+#if STATS_ENABLED == ENABLED
     // @Group: STAT
     // @Path: ../libraries/AP_Stats/AP_Stats.cpp
     AP_SUBGROUPINFO(stats, "STAT", 5, ParametersG2, AP_Stats),
+#endif
 
     // @Group: SERVO
     // @Path: ../libraries/SRV_Channel/SRV_Channels.cpp
     AP_SUBGROUPINFO(servo_channels, "SERVO", 6, ParametersG2, SRV_Channels),
 
     // @Group: RC
-    // @Path: ../libraries/RC_Channel/RC_Channels.cpp
-    AP_SUBGROUPINFO(rc_channels, "RC", 7, ParametersG2, RC_Channels),
+    // @Path: ../libraries/RC_Channel/RC_Channels_VarInfo.h
+    AP_SUBGROUPINFO(rc_channels, "RC", 7, ParametersG2, RC_Channels_Plane),
     
+#if SOARING_ENABLED == ENABLED
     // @Group: SOAR_
     // @Path: ../libraries/AP_Soaring/AP_Soaring.cpp
     AP_SUBGROUPINFO(soaring_controller, "SOAR_", 8, ParametersG2, SoaringController),
+#endif
   
     // @Param: RUDD_DT_GAIN
     // @DisplayName: rudder differential thrust gain
@@ -1186,12 +1171,32 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("HOME_RESET_ALT", 11, ParametersG2, home_reset_threshold, 0),
 
+#if GRIPPER_ENABLED == ENABLED
+    // @Group: GRIP_
+    // @Path: ../libraries/AP_Gripper/AP_Gripper.cpp
+    AP_SUBGROUPINFO(gripper, "GRIP_", 12, ParametersG2, AP_Gripper),
+#endif
+
+    // @Param: FLIGHT_OPTIONS
+    // @DisplayName: Flight mode options
+    // @Description: Flight mode specific options
+    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual Stabilize Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed
+    // @User: Advanced
+    AP_GROUPINFO("FLIGHT_OPTIONS", 13, ParametersG2, flight_options, 0),
+
+#ifdef ENABLE_SCRIPTING
+    // Scripting is intentionally not showing up in the parameter docs until it is a more standard feature
+    AP_SUBGROUPINFO(scripting, "SCR_", 14, ParametersG2, AP_Scripting),
+#endif
+
     AP_GROUPEND
 };
 
 ParametersG2::ParametersG2(void) :
-    ice_control(plane.rpm_sensor, plane.ahrs),
-    soaring_controller(plane.ahrs, plane.TECS_controller, plane.aparm)
+    ice_control(plane.rpm_sensor, plane.ahrs)
+#if SOARING_ENABLED == ENABLED
+    ,soaring_controller(plane.ahrs, plane.TECS_controller, plane.aparm)
+#endif
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -1248,7 +1253,7 @@ const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_quadplane,         14,      AP_PARAM_FLOAT, "Q_VXY_P" },
     { Parameters::k_param_quadplane,         15,      AP_PARAM_FLOAT, "Q_VZ_P" },
     { Parameters::k_param_quadplane,         16,      AP_PARAM_FLOAT, "Q_AZ_P" },
-    
+
     { Parameters::k_param_land_slope_recalc_shallow_threshold,0,AP_PARAM_FLOAT, "LAND_SLOPE_RCALC" },
     { Parameters::k_param_land_slope_recalc_steep_threshold_to_abort,0,AP_PARAM_FLOAT, "LAND_ABORT_DEG" },
     { Parameters::k_param_land_pitch_cd,      0,      AP_PARAM_INT16, "LAND_PITCH_CD" },
@@ -1263,6 +1268,11 @@ const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_land_abort_throttle_enable,0,AP_PARAM_INT8, "LAND_ABORT_THR" },
     { Parameters::k_param_land_flap_percent,  0,      AP_PARAM_INT8,  "LAND_FLAP_PERCENT" },
 
+    // battery failsafes
+    { Parameters::k_param_fs_batt_voltage,    0,      AP_PARAM_FLOAT, "BATT_FS_LOW_VOLT" },
+    { Parameters::k_param_fs_batt_mah,        0,      AP_PARAM_FLOAT, "BATT_FS_LOW_MAH" },
+
+    { Parameters::k_param_arming,             3,      AP_PARAM_INT8,  "ARMING_RUDDER" },
 };
 
 void Plane::load_parameters(void)
@@ -1285,7 +1295,7 @@ void Plane::load_parameters(void)
 
     uint32_t before = micros();
     // Load all auto-loaded EEPROM variables
-    AP_Param::load_all(false);
+    AP_Param::load_all();
     AP_Param::convert_old_parameters(&conversion_table[0], ARRAY_SIZE(conversion_table));
 
     // setup defaults in SRV_Channels
