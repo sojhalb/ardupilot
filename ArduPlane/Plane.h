@@ -784,6 +784,9 @@ private:
 #endif // CONFIG_HAL_BOARD
     
     void calculate_new_drop_location(void);
+
+    void glider_release(void);
+
     void adjust_nav_pitch_throttle(void);
     void update_load_factor(void);
     void send_fence_status(mavlink_channel_t chan);

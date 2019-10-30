@@ -1,17 +1,19 @@
 #include "Plane.h"
-#include "AP_Common.h"
+#include <AP_Common/AP_Common.h>
 #include <math.h>
 #include <AP_HAL/AP_HAL.h>
-#include "location.cpp"
+#include "Object_Drop.h"
+#include <utility>
+#include <math.h>
+#include <AP_Terrain/AP_Terrain.h>
+#include <GCS_MAVLink/GCS.h>
 
 #define OUTPUTCH 4
-#define INPUTCH 6;   
+#define INPUTCH 6   
 
-                                    //Tracks PWM values. Number of channels unknown
+//***most of the code is commented out to test the get_distance() function***
 
-/*
-STILL LEFT TODO:
-*/
+
 
 /* Testing out RC INPUTOUTPUT
 
@@ -43,34 +45,59 @@ void Object_Not_Release(){
 }
 
 void Plane::calculate_new_drop_location(){
-    if(next_WP_loc.lat != 0 && next_WP_loc.lon != 0){
 
-        int lat1 = current_location.lat;
-        int lon1 = current_location.lon;
-        int lat2 = next_WP_Loc.lat; 
-        int lon2 = next_WP_loc.lon;
-        int airspeed = airspeed.get_airspeed();
-        int altitude = current_location.alt
+
+
+    if(1/*next_WP_loc.lat != 0 && next_WP_loc.lng != 0*/){
+        //hal.rcin->enable_ch(INPUTCH);
+        uint16_t input = hal.rcin->read(INPUTCH);
+      //  int lat1 = current_loc.lat;
+       // int lon1 = current_loc.lng;
+      //  int lat2 = next_WP_loc.lat; 
+      //  int lon2 = next_WP_loc.lng;
+        //float airspd = airspeed.get_airspeed();
+       // int altitude = current_loc.alt;
 
         // finding distance
 
         // to radians = degree * pi/180
-        int earth_radius = 6378137;
+        //int earth_radius = 6378137;
         //int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
-        float d = get_distance(current_location, next_WP_loc);
-        
+        //float d = get_distance(current_loc, next_WP_loc);
+        float de = get_distance(ahrs.get_home(), current_loc); 
 
         // radius of target circle
-        int radius = 30;
+       // int radius = 30;
 
-        // distance that the dropped thing will land
-        int time = root(altitude/4.9)
-        double object_distance = airspeed * time
 
-        // if needs to be dropped or not
-        if( ( ((d - object_distance) < radius ) && ((d - object_distance) < (radius*-1)) || Is_Triggered_Glider() ){
-        Object_Release();
+        //float time = sqrtf(altitude/4.9);
+        //float object_distance = airspd * time;         // distance that the dropped thing will land
+
+
+        if (((de) >  500) || (input >= 1750)){
+            Object_Release();
+        } else {
+            Object_Not_Release();
         }
+
+        /*
+        if( ((d - object_distance) < radius )  && ((d - object_distance) < (radius*-1)) ){
+            Object_Release();
+        } else if (ahrs.get_home().lat == 0){
+            hal.rcout->enable_ch(OUTPUTCH);
+             hal.rcout->write(OUTPUTCH, 1600);
+        } else if ((de - object_distance) < radius) {
+            hal.rcout->enable_ch(OUTPUTCH);
+             hal.rcout->write(OUTPUTCH, 1450);
+        } else {
+            hal.rcout->enable_ch(OUTPUTCH);
+            hal.rcout->write(OUTPUTCH, 1400);
+        }
+
+        */
+
+
+
     }else {
         Object_Not_Release();
     }
@@ -105,10 +132,10 @@ void Plane::control_sequence ()
                 if(current_loc.alt > 50)   //50 feet
                 {
                     Object_Release();
-                    //Gripper_Release_Service(/*Need to input waypoint Locations, Glider_Gripper);
+                    Gripper_Release_Service(Need to input waypoint Locations, Glider_Gripper);
                 }
             }
-            /* Testing out RC INPUTOUTPUT
+             Testing out RC INPUTOUTPUT
             if(water.is_drop == false)
             {
                 if(current_loc.alt > 100)  //100 feet

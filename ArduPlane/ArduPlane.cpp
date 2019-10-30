@@ -21,6 +21,7 @@
  */
 
 #include "Plane.h"
+#include <AP_HAL/AP_HAL.h>
 
 #define SCHED_TASK(func, rate_hz, max_time_micros) SCHED_TASK_CLASS(Plane, &plane, func, rate_hz, max_time_micros)
 
@@ -34,6 +35,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
                            // Units:   Hz      us
 
     SCHED_TASK(calculate_new_drop_location, 400,200),
+    
     SCHED_TASK(ahrs_update,           400,    400),
     SCHED_TASK(read_radio,             50,    100),
     SCHED_TASK(check_short_failsafe,   50,    100),
@@ -61,6 +63,13 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_ICEngine, &plane.g2.ice_control, update, 10, 100),
     SCHED_TASK(compass_cal_update,     50,    50),
     SCHED_TASK(accel_cal_update,       10,    50),
+   
+   
+   
+    //SCHED_TASK(glider_release,          1200,  200),
+
+
+
 #if OPTFLOW == ENABLED
     SCHED_TASK(update_optical_flow,    50,    50),
 #endif
@@ -487,6 +496,17 @@ void Plane::update_flight_mode(void)
     {
     case AUTO:
         handle_auto_mode();
+        /*
+        hal.rcout->enable_ch(0);
+        hal.rcout->enable_ch(1);
+        hal.rcout->enable_ch(2);
+        hal.rcout->enable_ch(3);
+
+        hal.rcout->write(0, 1500);
+        hal.rcout->write(1, 1500);
+        hal.rcout->write(2, 1500);
+        hal.rcout->write(3, 1500);
+        */
         break;
 
     case AVOID_ADSB:
