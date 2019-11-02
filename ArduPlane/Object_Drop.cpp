@@ -15,25 +15,25 @@
 
 
 
-/* Testing out RC INPUTOUTPUT
+ //Testing out RC INPUTOUTPUT
 
 int Is_Triggered_Glider(uint8_t channel_num){
-//returns 1 if triggered and 0 if not triggered
 
-  int is_triggered = 0;
+  //returns 1 if triggered and 0 if not triggered
+  bool is_triggered = FALSE;
 
   //read from the channel and print the pwm value
   uint16_t input = hal.rcin->read(INPUTCH);
 
   //check value of channel and set to true if there are changes
   if (input > 1750){
-      is_triggered = 1;
+      is_triggered = TRUE;
   }
 
   return is_triggered;
 }
 
-*/
+
 
 void Object_Release(){
     hal.rcout->enable_ch(OUTPUTCH);
@@ -45,6 +45,10 @@ void Object_Not_Release(){
 }
 
 void Plane::calculate_new_drop_location(){
+<<<<<<< Updated upstream
+=======
+    if(next_WP_loc.lat != 0 && next_WP_loc.lon != 0)   {
+>>>>>>> Stashed changes
 
 
 
@@ -61,6 +65,7 @@ void Plane::calculate_new_drop_location(){
         // finding distance
 
         // to radians = degree * pi/180
+<<<<<<< Updated upstream
         //int earth_radius = 6378137;
         //int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
         //float d = get_distance(current_loc, next_WP_loc);
@@ -72,8 +77,17 @@ void Plane::calculate_new_drop_location(){
 
         //float time = sqrtf(altitude/4.9);
         //float object_distance = airspd * time;         // distance that the dropped thing will land
+=======
+       // int earth_radius = 6378137;
+        //int d= 2*asin(sqrt((sin((lat1-lat2)/2))^2 + cos(lat1)*cos(lat2)*(sin((lon1-lon2)/2))^2));
+        float distFromTarget = get_distance(current_location, next_WP_loc);
+
+        // radius of target circle
+        int radius = 50;
+>>>>>>> Stashed changes
 
 
+<<<<<<< Updated upstream
         if (((de) >  500) || (input >= 1750)){
             Object_Release();
         } else {
@@ -100,6 +114,15 @@ void Plane::calculate_new_drop_location(){
 
     }else {
         Object_Not_Release();
+=======
+        // if needs to be dropped or not
+        if( ( ((distFromTarget - object_distance) < radius ) && ((distFromTarget - object_distance) < (radius*-1)) || Is_Triggered_Glider() ){
+        Object_Release();
+        }
+    }   
+    else {
+    Object_Not_Release();
+>>>>>>> Stashed changes
     }
 }
 
@@ -155,7 +178,8 @@ void Plane::control_sequence ()
     }
 }
 */
-/* 
+
+
 void Plane::update_drop_water ()
 {
     if(water.is_drop == false)
@@ -171,4 +195,21 @@ void Plane::update_drop_glider ()
     if(glider.is_drop == false)
         glider.is_drop = true;
 }
-*/
+
+
+
+// CURRENTLY WIP
+// TODO: CHECK IF FUNCTIONS ACTUALLY FULFILLS ITS PURPOSE BY DROPPING PAYLOAD
+
+//Reduce risk of collision by dropping at different times
+void Plane::glider1_object_drop() {
+    calculate_new_drop_location();
+}
+
+void Plane::glider2_object_drop() {
+    calculate_new_drop_location();
+}
+
+
+
+
